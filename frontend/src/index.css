@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono:
+    ui-monospace, "SF Mono", "SFMono-Regular", "Menlo", "Consolas",
+    "Liberation Mono", monospace;
+
+  /* Muted copper/orange accent — the fourth accent alongside green/amber/red */
+  --color-copper-300: #e8b98a;
+  --color-copper-400: #d29a63;
+  --color-copper-500: #b87b45;
+  --color-copper-600: #96602f;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-neutral-950 text-neutral-200 antialiased;
+  }
+}

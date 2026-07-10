@@ -1,0 +1,23 @@
+{
+  "name": "@agentic-os/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Express backend for the MyBrain Agentic OS Dashboard — binds to 127.0.0.1 only",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2"
+  }
+}
