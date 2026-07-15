@@ -6,15 +6,9 @@ import { VaultPanel } from './modules/VaultPanel'
 import { NightlyLogPanel } from './modules/NightlyLogPanel'
 import { RunLogPanel } from './modules/RunLogPanel'
 import { ActionsPanel } from './modules/ActionsPanel'
-
-/** Modules that come online in later phases — shown honestly as pending, never mocked. */
-const PENDING_MODULES = [
-  {
-    title: 'Odoo Metrics',
-    desc: 'Inventory, top clients, declining accounts, overdue invoices. Read-only.',
-    phase: 'Phase 5',
-  },
-]
+import { OdooPanel } from './modules/OdooPanel'
+import { KnowledgePanel } from './modules/KnowledgePanel'
+import { QualityPanel } from './modules/QualityPanel'
 
 export default function App() {
   const health = useApiGet<HealthResponse>('/api/health', 15_000)
@@ -84,16 +78,14 @@ export default function App() {
           <RunLogPanel selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <OdooPanel />
+
+        <QualityPanel />
+
+        <KnowledgePanel />
+
+        <div className="grid gap-4">
           <NightlyLogPanel />
-          {PENDING_MODULES.map((mod) => (
-            <Panel key={mod.title} title={mod.title} pill={{ tone: 'neutral', label: 'Pending' }}>
-              <p className="text-xs leading-relaxed text-neutral-400">{mod.desc}</p>
-              <p className="mt-3 font-mono text-[11px] tracking-wider text-neutral-600 uppercase">
-                Comes online in {mod.phase}
-              </p>
-            </Panel>
-          ))}
         </div>
       </main>
     </div>

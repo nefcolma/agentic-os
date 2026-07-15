@@ -19,6 +19,8 @@ export interface AppConfig {
   vaultPath: string
   /** Claude Code CLI binary; spawned processes use cwd = vaultPath. */
   claudeBin: string
+  /** python3 binary used to invoke the read-only Odoo script directly. */
+  pythonBin: string
   /** Read-only Odoo script, invoked directly with python3 (never via Claude). */
   odooScriptPath: string
   prompts: {
@@ -32,6 +34,14 @@ export interface AppConfig {
   }
   /** ghl-sync skill directory — does not exist yet; checked for "not configured". */
   ghlSyncSkillDir: string
+  knowledge: {
+    /** Local, gitignored snapshot of the shared Drive knowledge base (agent-baked). */
+    snapshotPath: string
+    /** Where on-demand "baked" export bundles are written (gitignored). */
+    exportDir: string
+    /** Shared Drive folder the snapshot is extracted from (read-only). */
+    driveFolderId: string
+  }
   timeouts: {
     claudeRunMs: number
     odooMs: number
@@ -121,6 +131,7 @@ function buildConfig(): AppConfig {
     port: intFromEnv('BACKEND_PORT', 8790, 1, 65535),
     vaultPath,
     claudeBin: (process.env.CLAUDE_BIN ?? 'claude').trim(),
+    pythonBin: (process.env.PYTHON_BIN ?? 'python3').trim(),
     odooScriptPath: path.resolve(
       expandTilde(
         process.env.ODOO_SCRIPT_PATH ?? path.join(vaultClaudeDir, 'skills', 'odoo-sync', 'odoo_sync.py'),
@@ -142,6 +153,21 @@ function buildConfig(): AppConfig {
       ghlSyncUpdUrnsPath: path.join(vaultClaudeDir, 'prompts', 'ghl-sync-upd-urns.txt'),
     },
     ghlSyncSkillDir: path.join(vaultClaudeDir, 'skills', 'ghl-sync'),
+    knowledge: {
+      snapshotPath: path.resolve(
+        expandTilde(
+          process.env.KNOWLEDGE_SNAPSHOT_PATH ??
+            fileURLToPath(new URL('../../data/knowledge-snapshot.json', import.meta.url)),
+        ),
+      ),
+      exportDir: path.resolve(
+        expandTilde(
+          process.env.KNOWLEDGE_EXPORT_DIR ??
+            fileURLToPath(new URL('../../data/exports', import.meta.url)),
+        ),
+      ),
+      driveFolderId: (process.env.DRIVE_FOLDER_ID ?? '1qjGOwd5VRkCfaR2MfESUGqmHKFGEYv2b').trim(),
+    },
     timeouts: {
       claudeRunMs: intFromEnv('CLAUDE_RUN_TIMEOUT_MS', 900_000, 1_000, 3_600_000),
       odooMs: intFromEnv('ODOO_TIMEOUT_MS', 60_000, 1_000, 600_000),

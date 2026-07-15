@@ -5,3 +5,8 @@ node_modules/
 .DS_Store
 dist/
 build/
+
+# Local knowledge snapshots (real business data extracted from Drive/vault).
+# Held only on the local machine, served by the backend — never committed,
+# never baked into the frontend bundle.
+backend/data/

@@ -111,3 +111,149 @@ export interface ActionStatus {
 export interface ActionsResponse {
   actions: ActionStatus[]
 }
+
+// ── Odoo (read-only) ─────────────────────────────────────────────────────
+
+export type OdooStatus = 'ok' | 'not_configured' | 'error'
+
+export interface OdooEnvelope<TRow, TSummary> {
+  status: OdooStatus
+  resource: string
+  pulledAt: string
+  query: Record<string, string | number | boolean>
+  count: number
+  summary: TSummary | null
+  rows: TRow[]
+  message?: string
+  missing?: string[]
+}
+
+export interface InventoryRow {
+  productId: number | null
+  product: string
+  location: string
+  quantity: number
+  reserved: number
+}
+export interface InventorySummary {
+  lines: number
+  totalQuantity: number
+  outOfStock: number
+  lowStock: number
+}
+
+export interface TopClientRow {
+  partnerId: number | null
+  partner: string
+  orders: number
+  revenue: number
+}
+export interface TopClientSummary {
+  clients: number
+  totalRevenue: number
+}
+
+export interface DecliningClientRow {
+  partnerId: number | null
+  partner: string
+  priorOrders: number
+  priorTotal: number
+  recentTotal: number
+  dropPct: number
+}
+export interface DecliningSummary {
+  count: number
+  avgDropPct: number
+}
+
+export interface OverdueInvoiceRow {
+  invoice: string
+  partner: string
+  amount: number
+  invoiceDate: string | null
+  dueDate: string | null
+  paymentState: string
+}
+export interface OverdueSummary {
+  count: number
+  totalOverdue: number
+}
+
+// ── Knowledge viewer ─────────────────────────────────────────────────────
+
+export type KnowledgeSourceId = 'drive' | 'vault'
+
+export interface KnowledgeDocMeta {
+  id: string
+  name: string
+  path: string
+  mimeType: string
+  sizeBytes: number | null
+  modified: string | null
+  summary: string
+  contentExtracted: boolean
+}
+
+export interface KnowledgeCategory {
+  id: string
+  name: string
+  color: string
+  note: string
+  docs: KnowledgeDocMeta[]
+}
+
+export interface KnowledgeSource {
+  id: KnowledgeSourceId
+  label: string
+  kind: KnowledgeSourceId
+  available: boolean
+  meta: Record<string, unknown>
+  categories: KnowledgeCategory[]
+}
+
+export interface KnowledgeSourcesResponse {
+  sources: KnowledgeSource[]
+}
+
+export interface KnowledgeDocContent extends KnowledgeDocMeta {
+  source: KnowledgeSourceId
+  content: string | null
+  message?: string
+}
+
+// ── Data Quality Center ──────────────────────────────────────────────────
+
+export type Severity = 'critical' | 'high' | 'medium' | 'low'
+
+export interface QualityIssue {
+  issueId: string
+  issueType: string
+  category: string
+  title: string
+  description: string
+  severity: Severity
+  status: 'open'
+  confidence: number
+  company: string
+  source: { type: string; dataFreshness: 'live' | 'snapshot'; pulledAt: string }
+  detectedAt: string
+  sourceDate: string | null
+  affectedModels: string[]
+  affectedRecordCount: number | null
+  evidence: { summary: string; samples: string[] }
+  businessImpact: string
+  affectedMetrics: string[]
+  proposedOwner: string | null
+  recommendedAction: string
+  correctionRequiresWrite: boolean
+}
+
+export interface QualityScan {
+  status: 'ok' | 'not_configured' | 'error'
+  generatedAt: string
+  scanned: string[]
+  counts: { total: number; critical: number; high: number; medium: number; low: number }
+  issues: QualityIssue[]
+  missing?: string[]
+  message?: string
+}

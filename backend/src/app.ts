@@ -5,6 +5,9 @@ import { vaultRouter } from './routes/vault.js'
 import { lastLogRouter } from './routes/last-log.js'
 import { runsRouter } from './routes/runs.js'
 import { actionsRouter } from './routes/actions.js'
+import { odooRouter } from './routes/odoo.js'
+import { knowledgeRouter } from './routes/knowledge.js'
+import { qualityRouter } from './routes/quality.js'
 
 const apiNotFound: RequestHandler = (_req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown API route' } })
@@ -27,6 +30,9 @@ export function createApp(): express.Express {
   app.use(lastLogRouter)
   app.use(runsRouter)
   app.use(actionsRouter)
+  app.use(odooRouter)
+  app.use(knowledgeRouter)
+  app.use(qualityRouter)
 
   app.use('/api', apiNotFound)
   app.use(errorHandler)
