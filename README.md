@@ -79,10 +79,37 @@ npm run build      # compila backend (tsc) y frontend (vite build)
 - [x] Fase 2 — Lectura real del vault (`/api/vault-summary`, `/api/last-log`)
 - [x] Fase 3 — RunManager, logs y SSE (`/api/runs`, `/api/runs/:id/stream`)
 - [x] Fase 4 — Acciones Claude (`/api/run/*`, `/api/actions`; GHL e inbox-classify en "not configured")
-- [ ] Fase 5 — Integración Odoo read-only (`/api/odoo/*`)
+- [x] Fase 5 — Integración Odoo read-only (`/api/odoo/*`, validación de params, datos reales)
+- [x] Fase 5.5 — Visor de conocimiento (Drive snapshot + vault, `/api/knowledge/*`) y Data Quality Center (`/api/quality/issues`)
 - [ ] Fase 6 — Dashboard visual completo
 - [ ] Fase 7 — Document cards y modal Markdown
 - [ ] Fase 8 — Pruebas, seguridad y documentación final
+
+## Knowledge snapshot (Drive) y Data Quality Center
+
+**Visor de conocimiento** — dos fuentes estrictamente separadas:
+
+- **Drive "obsidianbus"** (compartido, read-only): el backend **no tiene
+  credenciales de Drive**; sirve un *snapshot* local generado por el agente
+  (Claude) mediante extracción read-only. El snapshot vive en
+  `backend/data/knowledge-snapshot.json` (**gitignored** — datos reales de
+  negocio, nunca commiteados ni incrustados en el bundle del frontend).
+  Para **re-hornear** (actualizar) el snapshot, pídele a Claude que vuelva a
+  extraer el Drive; regenera el JSON con `node backend/data/build-snapshot.mjs`.
+- **Vault MyBrain** (local): se lee fresco del disco en cada petición.
+
+Endpoints: `GET /api/knowledge/sources`, `GET /api/knowledge/doc?source=&id=`,
+`POST /api/knowledge/export` (escribe un bundle "baked" portable a
+`backend/data/exports/`, también gitignored — para compartir/portar bajo demanda).
+
+**Data Quality Center** — `GET /api/quality/issues` corre detectores
+deterministas sobre tu Odoo **en vivo** (inventario negativo, SKUs faltantes,
+clientes duplicados, facturas de residual casi-cero, registros de partner
+incompletos) más una comprobación de frescura del snapshot. Cada issue trae
+los 11 campos de revisión (tipo, severidad, estado, confianza, fuente, fecha,
+evidencia, impacto, métricas afectadas, responsable, recomendación). **Solo
+detecta y recomienda** — nunca escribe en Odoo; cualquier corrección quedaría
+marcada como acción de escritura que requiere confirmación explícita.
 
 ## Troubleshooting
 
