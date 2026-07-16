@@ -98,6 +98,34 @@ contains only "Not logged in · Please run /login" — the user's nightly cron i
 failing for the same reason. **Action: run `claude auth login`.** No code change
 can fix a machine-level credential.
 
+## Remote access (Cloudflare Tunnel + Access)
+
+The supported way to reach this dashboard from outside the machine. The backend
+still binds `127.0.0.1`; a named tunnel is the only ingress and Cloudflare
+Access is the identity layer. Design notes:
+
+- **Local vs remote is decided by the Host header.** `localhost` ⇒ the machine's
+  owner ⇒ admin. A hostname listed in `TRUSTED_HOSTS` ⇒ remote ⇒ must present
+  identity. This is why `cloudflared` must **not** rewrite the Host
+  (`httpHostHeader`): that would make tunnel traffic indistinguishable from the
+  owner's and silently grant admin.
+- **Declaring a trusted host grants nothing.** It only marks traffic as remote,
+  which *raises* the bar.
+- **The JWT is verified**, not trusted. `Cf-Access-Jwt-Assertion` is checked
+  against Cloudflare's public keys (issuer + audience) via `jose`. The plain
+  `Cf-Access-Authenticated-User-Email` header is deliberately ignored — anything
+  that could reach the origin could forge it. Covered by a test.
+- **Fail-closed.** Remote traffic with Access unconfigured, or a missing/invalid
+  assertion, gets 403 — a misconfigured tunnel is a closed door, never an open
+  one.
+- **Roles.** `ADMIN_EMAILS` may write; every other authenticated identity is
+  read-only (`roleGuard` rejects all non-GET). Viewers still see live data,
+  including streaming run logs. The UI hides write controls, but the backend is
+  the enforcement point.
+
+Residual: the tunnel is only up while the machine is. That is inherent — the
+vault and the `claude` CLI live there.
+
 ## Controls in place
 
 - **Network:** binds `127.0.0.1` only; the server refuses to start on any

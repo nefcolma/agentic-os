@@ -28,6 +28,26 @@ export interface AppConfig {
   pythonBin: string
   /** Local, gitignored dir for snapshots, exports, backups and settings.json. */
   dataDir: string
+  /** Built frontend, served by the backend so a tunnel needs only one origin. */
+  frontendDistPath: string
+  security: {
+    /**
+     * Extra Host values allowed besides localhost — i.e. your Cloudflare Tunnel
+     * hostname. Traffic arriving on one of these is treated as REMOTE and must
+     * present a valid Cloudflare Access JWT (fail-closed).
+     */
+    trustedHosts: string[]
+    /** Extra Origins allowed for state-changing requests (your tunnel URL). */
+    trustedOrigins: string[]
+  }
+  access: {
+    /** e.g. "yourteam.cloudflareaccess.com" — enables remote identity checks. */
+    teamDomain: string
+    /** Access Application Audience (AUD) tag. */
+    audience: string
+    /** Emails with write access. Everyone else authenticated is read-only. */
+    adminEmails: string[]
+  }
   knowledge: {
     /** Local, gitignored snapshot of the shared Drive knowledge base (agent-baked). */
     snapshotPath: string
@@ -90,6 +110,14 @@ function expandTilde(p: string): string {
   return p
 }
 
+/** Parses a comma-separated env var into a trimmed, non-empty list. */
+function csvFromEnv(name: string): string[] {
+  return (process.env[name] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '')
+}
+
 function intFromEnv(name: string, fallback: number, min: number, max: number): number {
   const raw = process.env[name]
   if (raw === undefined || raw.trim() === '') return fallback
@@ -128,6 +156,20 @@ function buildConfig(): AppConfig {
     claudeBin: (process.env.CLAUDE_BIN ?? 'claude').trim(),
     pythonBin: (process.env.PYTHON_BIN ?? 'python3').trim(),
     dataDir,
+    frontendDistPath: path.resolve(
+      expandTilde(
+        process.env.FRONTEND_DIST_PATH ?? fileURLToPath(new URL('../../../frontend/dist', import.meta.url)),
+      ),
+    ),
+    security: {
+      trustedHosts: csvFromEnv('TRUSTED_HOSTS'),
+      trustedOrigins: csvFromEnv('TRUSTED_ORIGINS'),
+    },
+    access: {
+      teamDomain: (process.env.ACCESS_TEAM_DOMAIN ?? '').trim(),
+      audience: (process.env.ACCESS_AUD ?? '').trim(),
+      adminEmails: csvFromEnv('ADMIN_EMAILS').map((e) => e.toLowerCase()),
+    },
     knowledge: {
       snapshotPath: path.resolve(
         expandTilde(

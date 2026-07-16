@@ -3,6 +3,7 @@ import { apiGet, apiPost, ApiError } from '../lib/api'
 import type { RunInfo, RunsListResponse, RunStatus, StartRunResponse } from '../lib/types'
 import { useRunStream } from '../lib/useRunStream'
 import { Panel, Pill } from '../components/ui'
+import { useSession } from '../lib/session'
 import type { PillTone } from '../components/ui'
 
 const STATUS_TONE: Record<RunStatus, PillTone> = {
@@ -36,6 +37,7 @@ export function RunLogPanel({
   const [actionError, setActionError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
   const logRef = useRef<HTMLPreElement>(null)
+  const { canWrite } = useSession()
 
   const { run: streamedRun, lines } = useRunStream(selectedRunId)
 
@@ -111,7 +113,7 @@ export function RunLogPanel({
           <button
             type="button"
             onClick={() => void startSelfTest()}
-            disabled={starting}
+            disabled={starting || !canWrite}
             className="rounded border border-copper-500/40 px-3 py-1.5 font-mono text-[11px] tracking-widest text-copper-300 uppercase transition-colors hover:bg-copper-500/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Run self-test
@@ -159,7 +161,7 @@ export function RunLogPanel({
                 {selectedRun.title} · {selectedRun.logBytes} bytes
                 {selectedRun.logTruncatedHead ? ' · head truncated' : ''}
               </span>
-              {(selectedRun.status === 'running' || selectedRun.status === 'queued') && (
+              {canWrite && (selectedRun.status === 'running' || selectedRun.status === 'queued') && (
                 <button
                   type="button"
                   onClick={() => void cancelRun(selectedRun.id)}

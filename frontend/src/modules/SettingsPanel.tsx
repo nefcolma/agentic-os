@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { apiGet, apiPost, ApiError } from '../lib/api'
 import type { VaultConfigResponse, VaultDetectResponse, VaultStatus } from '../lib/types'
 import { Panel, Pill } from '../components/ui'
+import { useSession } from '../lib/session'
 
 const SOURCE_LABEL: Record<string, string> = {
   user: 'connected by you',
@@ -36,6 +37,7 @@ export function SettingsPanel() {
   const [checked, setChecked] = useState<VaultStatus | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const { canWrite } = useSession()
 
   useEffect(() => {
     void (async () => {
@@ -119,7 +121,7 @@ export function SettingsPanel() {
             {config.source === 'user' && (
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || !canWrite}
                 onClick={() => void reset()}
                 className="rounded border border-neutral-700 px-2 py-1 font-mono text-[10px] tracking-wider text-neutral-400 uppercase hover:bg-neutral-800 disabled:opacity-40"
               >
@@ -158,7 +160,7 @@ export function SettingsPanel() {
             </button>
             <button
               type="button"
-              disabled={busy || input.trim() === ''}
+              disabled={busy || !canWrite || input.trim() === ''}
               onClick={() => void connect(input)}
               className="rounded border border-copper-500/50 bg-copper-500/10 px-3 py-1 font-mono text-[10px] tracking-wider text-copper-300 uppercase hover:bg-copper-500/20 disabled:opacity-40"
             >
@@ -194,7 +196,7 @@ export function SettingsPanel() {
                       {c.hasObsidian && <Pill tone="copper" label="Obsidian" />}
                       <button
                         type="button"
-                        disabled={busy}
+                        disabled={busy || !canWrite}
                         onClick={() => void connect(c.path)}
                         className="rounded border border-neutral-700 px-2 py-1 font-mono text-[10px] tracking-wider text-neutral-300 uppercase hover:bg-neutral-800 disabled:opacity-40"
                       >

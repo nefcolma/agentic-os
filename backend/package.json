@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Local Express backend for the MyBrain Agentic OS Dashboard \u2014 binds to 127.0.0.1 only",
+  "description": "Local Express backend for the MyBrain Agentic OS Dashboard — binds to 127.0.0.1 only",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
@@ -13,7 +13,8 @@
   },
   "dependencies": {
     "express": "^5.2.1",
-    "gray-matter": "^4.0.3"
+    "gray-matter": "^4.0.3",
+    "jose": "^6.2.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

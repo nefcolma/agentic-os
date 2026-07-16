@@ -1,5 +1,8 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import express from 'express'
 import type { ErrorRequestHandler, RequestHandler } from 'express'
+import { config } from './config/index.js'
 import { healthRouter } from './routes/health.js'
 import { vaultRouter } from './routes/vault.js'
 import { lastLogRouter } from './routes/last-log.js'
@@ -10,7 +13,9 @@ import { knowledgeRouter } from './routes/knowledge.js'
 import { qualityRouter } from './routes/quality.js'
 import { regenerateRouter } from './routes/regenerate.js'
 import { vaultConfigRouter } from './routes/vault-config.js'
+import { sessionRouter } from './routes/session.js'
 import { hostGuard, csrfGuard } from './middleware/security.js'
+import { accessGuard, roleGuard } from './middleware/access.js'
 
 const apiNotFound: RequestHandler = (_req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown API route' } })
@@ -27,13 +32,18 @@ export function createApp(): express.Express {
   const app = express()
   app.disable('x-powered-by')
 
-  // Guards run before any route: binding to loopback keeps the network out, but
-  // a page in the user's own browser can still reach us. hostGuard blocks DNS
-  // rebinding; csrfGuard blocks cross-site state-changing requests.
+  // Order matters:
+  //  hostGuard   — only localhost or a declared tunnel hostname may talk to us
+  //  accessGuard — resolves identity; remote traffic must prove it via Access
+  //  csrfGuard   — blocks cross-site state changes from the user's browser
+  //  roleGuard   — viewers may read, only admins may change anything
   app.use(hostGuard)
+  app.use(accessGuard)
   app.use(csrfGuard)
+  app.use(roleGuard)
   app.use(express.json({ limit: '1mb' }))
 
+  app.use(sessionRouter)
   app.use(healthRouter)
   app.use(vaultRouter)
   app.use(lastLogRouter)
@@ -46,6 +56,17 @@ export function createApp(): express.Express {
   app.use(vaultConfigRouter)
 
   app.use('/api', apiNotFound)
+
+  // Serve the built frontend when it exists, so a tunnel needs only ONE origin
+  // (`npm run build && npm start`). In dev this is absent and Vite serves it.
+  if (fs.existsSync(config.frontendDistPath)) {
+    app.use(express.static(config.frontendDistPath))
+    // SPA fallback for non-/api routes.
+    app.get(/.*/, (_req, res) => {
+      res.sendFile(path.join(config.frontendDistPath, 'index.html'))
+    })
+  }
+
   app.use(errorHandler)
   return app
 }

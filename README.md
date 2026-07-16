@@ -92,6 +92,75 @@ proyecto descansa en esa frase.
 
 Detalle completo, hallazgos y riesgos residuales: **[SECURITY.md](SECURITY.md)**.
 
+## Acceso remoto con Cloudflare Tunnel + Access (opcional)
+
+La forma segura de darle una URL a tu equipo **con datos reales y en vivo**, sin
+mover nada de tu máquina y sin escribir una capa de auth. El backend sigue atado
+a `127.0.0.1`; el túnel es la entrada y Access es la identidad.
+
+> ⚠️ **Nunca uses el "quick tunnel"** (`cloudflared tunnel --url ...`, URL
+> `trycloudflare.com`): es público y sin autenticación.
+
+### 1. Un solo origen
+```bash
+npm run build && npm start     # el backend sirve el frontend en :8790
+```
+
+### 2. Túnel
+```bash
+brew install cloudflared
+cloudflared tunnel login
+cloudflared tunnel create agentic-os
+cloudflared tunnel route dns agentic-os brain.tudominio.com
+```
+
+`~/.cloudflared/config.yml` — **sin `httpHostHeader`**: el backend necesita ver
+el hostname real para distinguir el tráfico remoto del tuyo local.
+```yaml
+tunnel: <TU-UUID>
+credentials-file: /Users/tu-usuario/.cloudflared/<TU-UUID>.json
+ingress:
+  - hostname: brain.tudominio.com
+    service: http://127.0.0.1:8790
+  - service: http_status:404
+```
+
+```bash
+cloudflared tunnel run agentic-os     # prueba
+sudo cloudflared service install      # que arranque solo
+```
+
+### 3. Access (la autenticación)
+Zero Trust → **Access → Applications → Add an application → Self-hosted**:
+- Domain: `brain.tudominio.com`
+- Políticas: `Admin` → Allow → Emails → `neftali@colma.com`; `Equipo` → Allow →
+  *Emails ending in* `@colma.com`
+- Identity provider: *One-time PIN* (login por email) viene activo.
+
+Desde ahí agregas y quitas usuarios **sin tocar código**.
+
+### 4. Conecta el backend con Access (`.env`)
+```bash
+TRUSTED_HOSTS=brain.tudominio.com
+TRUSTED_ORIGINS=https://brain.tudominio.com
+ACCESS_TEAM_DOMAIN=tuequipo.cloudflareaccess.com
+ACCESS_AUD=<Application Audience (AUD) Tag de la app en Access>
+ADMIN_EMAILS=neftali@colma.com
+```
+
+### Cómo se comporta
+| Origen | Identidad | Permisos |
+|---|---|---|
+| `localhost` (tu máquina) | dueño | **admin** — todo |
+| Túnel, email en `ADMIN_EMAILS` | JWT de Access verificado | **admin** — todo |
+| Túnel, cualquier otro email | JWT de Access verificado | **solo lectura** — ve todo en vivo (incluidos los logs SSE), no puede disparar nada |
+| Túnel sin JWT válido | — | **403** |
+| Cualquier otro Host | — | **403** |
+
+**Fail-closed:** si Access queda mal configurado, el túnel devuelve 403 — nunca
+una puerta abierta. El JWT se **verifica** contra las llaves públicas de
+Cloudflare; la cabecera del email **no** se confía por sí sola.
+
 ## Estado de fases
 
 - [x] Fase 0 — Auditoría del entorno

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useApiGet, apiPost, ApiError } from '../lib/api'
 import type { ActionsResponse, ActionStatus, RunInfo, StartRunResponse } from '../lib/types'
 import { Panel, Pill } from '../components/ui'
+import { useSession } from '../lib/session'
 
 /** Fixed endpoint per action kind — mirrors the backend registry (PRD §5.2). */
 const START_REQUEST: Record<string, { path: string; body?: unknown }> = {
@@ -27,6 +28,7 @@ function ActionRow({
 }) {
   const [armed, setArmed] = useState(false)
   const [busy, setBusy] = useState(false)
+  const { canWrite } = useSession()
 
   const needsConfirm = action.group === WRITE_GROUP
 
@@ -65,7 +67,7 @@ function ActionRow({
           )}
           <button
             type="button"
-            disabled={!action.configured || busy}
+            disabled={!action.configured || busy || !canWrite}
             onClick={() => void trigger()}
             className={`rounded border px-3 py-1 font-mono text-[10px] tracking-widest uppercase transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${
               armed

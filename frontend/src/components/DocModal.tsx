@@ -3,6 +3,7 @@ import { apiGet, apiPost, ApiError } from '../lib/api'
 import type { KnowledgeSourceId, KnowledgeDocMeta, KnowledgeDocContent } from '../lib/types'
 import { Markdown } from '../lib/markdown'
 import { lineDiff, diffStats } from '../lib/diff'
+import { useSession } from '../lib/session'
 
 export function vaultNameFromPath(p: unknown): string {
   return typeof p === 'string' ? (p.split('/').filter(Boolean).pop() ?? 'MyBrain') : 'MyBrain'
@@ -70,6 +71,7 @@ export function DocModal({
     { status: 'loading' | 'error'; message?: string } | { status: 'ok'; data: KnowledgeDocContent }
   >({ status: 'loading' })
   const [regen, setRegen] = useState<RegenState>({ phase: 'idle' })
+  const { canWrite } = useSession()
 
   useEffect(() => {
     let cancelled = false
@@ -94,7 +96,7 @@ export function DocModal({
     source === 'vault'
       ? `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(doc.path.replace(/\.md$/i, ''))}`
       : null
-  const canRegenerate = source === 'vault'
+  const canRegenerate = source === 'vault' && canWrite
 
   async function startPreview(): Promise<void> {
     setRegen({ phase: 'previewing' })

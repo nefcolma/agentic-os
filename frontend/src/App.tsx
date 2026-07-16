@@ -13,6 +13,7 @@ import { OdooPanel } from './modules/OdooPanel'
 import { KnowledgePanel } from './modules/KnowledgePanel'
 import { QualityPanel } from './modules/QualityPanel'
 import { KnowledgeMap } from './modules/KnowledgeMap'
+import { SessionProvider, useSession } from './lib/session'
 import { SettingsPanel } from './modules/SettingsPanel'
 
 const NAV: NavItem[] = [
@@ -68,7 +69,8 @@ function Container({ children, wide = false }: { children: React.ReactNode; wide
   return <div className={`mx-auto ${wide ? 'max-w-7xl' : 'max-w-6xl'} space-y-4 p-5`}>{children}</div>
 }
 
-export default function App() {
+function Dashboard() {
+  const session = useSession()
   const [view, setView] = useState('command')
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const health = useApiGet<HealthResponse>('/api/health', 15_000)
@@ -88,6 +90,10 @@ export default function App() {
           {vault.data.folders.projects.count} proj · {vault.data.folders.areas.count} areas ·{' '}
           {vault.data.folders.inbox.count} inbox
         </span>
+      )}
+      {!session.canWrite && <Pill tone="copper" label="Read-only" />}
+      {session.email && (
+        <span className="hidden font-mono text-[10px] text-neutral-500 lg:inline">{session.email}</span>
       )}
       <span className="font-mono text-[10px] tracking-wider text-neutral-500 uppercase">System</span>
       <Pill tone={systemPill.tone} label={systemPill.label} />
@@ -143,5 +149,13 @@ export default function App() {
         </Container>
       )}
     </Shell>
+  )
+}
+
+export default function App() {
+  return (
+    <SessionProvider>
+      <Dashboard />
+    </SessionProvider>
   )
 }
