@@ -9,6 +9,7 @@ import { odooRouter } from './routes/odoo.js'
 import { knowledgeRouter } from './routes/knowledge.js'
 import { qualityRouter } from './routes/quality.js'
 import { regenerateRouter } from './routes/regenerate.js'
+import { vaultConfigRouter } from './routes/vault-config.js'
 
 const apiNotFound: RequestHandler = (_req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown API route' } })
@@ -35,6 +36,7 @@ export function createApp(): express.Express {
   app.use(knowledgeRouter)
   app.use(qualityRouter)
   app.use(regenerateRouter)
+  app.use(vaultConfigRouter)
 
   app.use('/api', apiNotFound)
   app.use(errorHandler)

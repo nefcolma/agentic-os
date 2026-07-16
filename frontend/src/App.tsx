@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Gauge, Network, Zap, Database, ShieldCheck, FileText } from 'lucide-react'
+import { Gauge, Network, Zap, Database, ShieldCheck, FileText, Settings } from 'lucide-react'
 import { useApiGet } from './lib/api'
 import type { HealthResponse, VaultSummary } from './lib/types'
 import { Panel, Pill, KeyValue } from './components/ui'
@@ -13,6 +13,7 @@ import { OdooPanel } from './modules/OdooPanel'
 import { KnowledgePanel } from './modules/KnowledgePanel'
 import { QualityPanel } from './modules/QualityPanel'
 import { KnowledgeMap } from './modules/KnowledgeMap'
+import { SettingsPanel } from './modules/SettingsPanel'
 
 const NAV: NavItem[] = [
   { id: 'command', label: 'Command', icon: Gauge },
@@ -21,6 +22,7 @@ const NAV: NavItem[] = [
   { id: 'odoo', label: 'Odoo', icon: Database },
   { id: 'quality', label: 'Data Quality', icon: ShieldCheck },
   { id: 'knowledge', label: 'Knowledge', icon: FileText },
+  { id: 'settings', label: 'Settings', icon: Settings },
 ]
 
 function SystemCard({ health }: { health: ReturnType<typeof useApiGet<HealthResponse>> }) {
@@ -132,6 +134,12 @@ export default function App() {
       {view === 'knowledge' && (
         <Container>
           <KnowledgePanel />
+        </Container>
+      )}
+
+      {view === 'settings' && (
+        <Container>
+          <SettingsPanel />
         </Container>
       )}
     </Shell>

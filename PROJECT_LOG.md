@@ -271,6 +271,40 @@ the *only* place the dashboard writes to the vault.
   until the machine's `claude` credential is fixed (`claude auth login`); the
   same 401 first found in Phase 4 still stands.
 
+### Per-user vault connection *(this entry)*
+**Problem:** the vault path was frozen at startup from `MYBRAIN_VAULT_PATH`, so
+the whole dashboard depended on one specific person's vault. Anyone else running
+it had to edit `.env` and restart — and `runners/claude-actions.ts` baked the
+vault into its specs at *module load*, so even an env change mid-process
+wouldn't fully take.
+
+**Fix — the active vault became runtime state:**
+- `services/vault-settings.ts` — the single source of truth for the active
+  vault: `getVaultPath()` / `vaultPaths()` (derived `.claude`, prompts, odoo
+  script, nightly log), plus inspect / set / reset / detect. Precedence:
+  user choice (`data/settings.json`, gitignored) > `MYBRAIN_VAULT_PATH` > default.
+- `config` keeps only `defaultVaultPath` as a fallback; all vault-derived paths
+  moved out. 39 usages across 8 files migrated to the runtime getters.
+- `ClaudeActionSpec.promptSource` and `.cwd` became **lazy functions**, so the
+  action catalog always follows the currently connected vault.
+- Endpoints: `GET /api/vault/config`, `GET /api/vault/inspect?path=`,
+  `GET /api/vault/detect`, `POST /api/vault/config`, `.../reset`.
+- Frontend: a **Settings** view (gear nav) showing the connected vault + its
+  health, a path input with *Check*, one-click *Use* for auto-detected vaults,
+  and *Reset to default*. Connecting reloads the dashboard so every panel
+  re-derives.
+
+**Validation guardrails:** must exist, be a directory, and contain `.md` or
+`.obsidian`; paths that are too broad (filesystem root, a top-level dir, or the
+home dir) are refused — otherwise vault reads and the Regenerate write path
+would have unrelated files in reach.
+
+**Verified:** connecting a scratch vault changed `/api/vault-summary` (1 proj /
+1 area), `/api/health`, and `/api/actions` (prompts now resolved inside the new
+vault's `.claude/`) — all **without restarting the backend**, proving the lazy
+refactor. Rejections confirmed for a missing path, the home dir, and a folder
+with no notes. Reset restored the original vault (4/3/1).
+
 ### Phase 8 — not yet built
 Tests, security review, final docs.
 

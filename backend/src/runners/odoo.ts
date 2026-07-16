@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import { config } from '../config/index.js'
 import { redactSecrets } from '../utils/redact.js'
 import { BadRequestError } from '../utils/params.js'
+import { getVaultPath, vaultPaths } from '../services/vault-settings.js'
 
 /**
  * OdooRunner — deterministic, read-only Odoo access.
@@ -44,7 +45,7 @@ const REQUIRED_ODOO_ENV = ['ODOO_URL', 'ODOO_USERNAME', 'ODOO_API_KEY'] as const
 
 export function odooMissingRequirements(): string[] {
   const missing: string[] = []
-  if (!fs.existsSync(config.odooScriptPath)) missing.push(`odoo script ${config.odooScriptPath}`)
+  if (!fs.existsSync(vaultPaths().odooScript)) missing.push(`odoo script ${vaultPaths().odooScript}`)
   for (const key of REQUIRED_ODOO_ENV) {
     if (!process.env[key]) missing.push(`env ${key}`)
   }
@@ -59,8 +60,8 @@ interface RawSpawnResult {
 
 function runScript(subcommand: string, args: string[]): Promise<RawSpawnResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(config.pythonBin, [config.odooScriptPath, subcommand, ...args], {
-      cwd: config.vaultPath,
+    const child = spawn(config.pythonBin, [vaultPaths().odooScript, subcommand, ...args], {
+      cwd: getVaultPath(),
       env: process.env,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,

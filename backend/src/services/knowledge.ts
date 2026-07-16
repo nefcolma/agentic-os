@@ -4,6 +4,7 @@ import path from 'node:path'
 import matter from 'gray-matter'
 import { config } from '../config/index.js'
 import { redactSecrets } from '../utils/redact.js'
+import { getVaultPath } from './vault-settings.js'
 
 /**
  * KnowledgeService — the "knowledge viewer" data layer. Exposes TWO strictly
@@ -194,7 +195,7 @@ function decodeVaultId(id: string): string | null {
 }
 
 async function listVaultFolder(folder: string): Promise<KnowledgeDocMeta[]> {
-  const dirAbs = path.join(config.vaultPath, folder)
+  const dirAbs = path.join(getVaultPath(), folder)
   let entries
   try {
     entries = await fsp.readdir(dirAbs, { withFileTypes: true })
@@ -232,7 +233,7 @@ async function listVaultFolder(folder: string): Promise<KnowledgeDocMeta[]> {
 }
 
 async function vaultSource(): Promise<KnowledgeSource> {
-  const available = fs.existsSync(config.vaultPath)
+  const available = fs.existsSync(getVaultPath())
   const categories: KnowledgeCategory[] = []
   if (available) {
     for (const c of VAULT_CATEGORIES) {
@@ -245,7 +246,7 @@ async function vaultSource(): Promise<KnowledgeSource> {
     label: 'Vault — MyBrain (local)',
     kind: 'vault',
     available,
-    meta: { path: config.vaultPath, live: true },
+    meta: { path: getVaultPath(), live: true },
     categories,
   }
 }
@@ -258,8 +259,8 @@ async function vaultSource(): Promise<KnowledgeSource> {
 export function resolveVaultDoc(id: string): { relPath: string; absPath: string } | null {
   const relPath = decodeVaultId(id)
   if (relPath === null) return null
-  const abs = path.resolve(config.vaultPath, relPath)
-  if (abs !== config.vaultPath && !abs.startsWith(config.vaultPath + path.sep)) return null
+  const abs = path.resolve(getVaultPath(), relPath)
+  if (abs !== getVaultPath() && !abs.startsWith(getVaultPath() + path.sep)) return null
   if (!abs.toLowerCase().endsWith('.md')) return null
   return { relPath, absPath: abs }
 }

@@ -87,10 +87,15 @@ export interface ClaudeActionSpec {
   description: string
   /** Mutex group — all vault-writing actions share 'vault-write'. */
   mutexGroup: string
-  promptSource: PromptSource
+  /**
+   * Lazy on purpose: the active vault can change at runtime (the user connects
+   * their own), so prompt paths and cwd must be resolved per run, never frozen
+   * at module load.
+   */
+  promptSource: () => PromptSource
   /** Comma-separated tool list passed verbatim to --allowedTools. */
   allowedTools: string
-  cwd: string
+  cwd: () => string
   timeoutMs: number
   /** Names of missing requirements (files, skills, env var NAMES — never values). */
   checkMissing: () => string[]
@@ -116,7 +121,7 @@ export interface ResolvedPrompt {
 }
 
 export function resolvePrompt(spec: ClaudeActionSpec): ResolvedPrompt {
-  const source = spec.promptSource
+  const source = spec.promptSource()
   if (source.type === 'file') {
     let text: string
     try {
@@ -158,13 +163,15 @@ export function makeClaudeRunDefinition(spec: ClaudeActionSpec): RunDefinition {
     },
     build: () => {
       // Fresh prompt read on every run — same behavior as the cron's $(cat …).
+      // cwd resolves now, so a run always targets the currently connected vault.
       const { prompt, sourceNote } = resolvePrompt(spec)
+      const cwd = spec.cwd()
       return {
         command: config.claudeBin,
         args: buildClaudeArgs(prompt, spec.allowedTools),
-        cwd: spec.cwd,
+        cwd,
         env: sanitizedClaudeEnv(),
-        note: `${sourceNote} · allowedTools=[${spec.allowedTools}] · cwd=${spec.cwd}`,
+        note: `${sourceNote} · allowedTools=[${spec.allowedTools}] · cwd=${cwd}`,
       }
     },
   }

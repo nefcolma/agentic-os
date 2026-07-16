@@ -47,7 +47,7 @@ Variables principales (todas centralizadas en `backend/src/config/index.ts`):
 |---|---|---|
 | `BACKEND_PORT` | `8790` | Puerto del backend (no usa `PORT` para evitar colisiones con tooling del frontend) |
 | `HOST` | `127.0.0.1` | Solo loopback; el servidor rechaza cualquier otro valor |
-| `MYBRAIN_VAULT_PATH` | `~/Documents/MyBrain` | Ruta al vault |
+| `MYBRAIN_VAULT_PATH` | `~/Documents/MyBrain` | Vault **por defecto** solamente. Cada usuario conecta el suyo desde la UI (ver abajo); esa elección manda. |
 | `CLAUDE_BIN` | `claude` | Binario de Claude Code |
 | `CLAUDE_RUN_TIMEOUT_MS` | `900000` | Timeout de ejecuciones Claude |
 | `ODOO_TIMEOUT_MS` | `60000` | Timeout del script de Odoo |
@@ -86,6 +86,32 @@ npm run build      # compila backend (tsc) y frontend (vite build)
 - [ ] Fase 6 — Dashboard visual completo
 - [ ] Fase 7 — Document cards y modal Markdown
 - [ ] Fase 8 — Pruebas, seguridad y documentación final
+
+## Conecta tu propio vault (cada usuario el suyo)
+
+El dashboard **no depende del vault de nadie en particular**. Al abrirlo, ve a
+**Settings** (icono de engranaje) y conecta cualquier vault de Obsidian o
+carpeta de notas de tu computadora:
+
+- **Detección automática** — lista las carpetas de tu máquina que parecen vault
+  (tienen `.obsidian` o `.claude`); un clic en *Use* y listo.
+- **Ruta manual** — pega la ruta y usa *Check* para validarla antes de conectar.
+- **Efecto inmediato** — todo (vault summary, Knowledge, acciones de Claude,
+  Odoo, Regenerate) apunta al vault conectado **sin reiniciar** el backend.
+- **Se guarda localmente** en `backend/data/settings.json` (gitignored), así que
+  tu elección es tuya y no viaja al repo.
+
+Precedencia: **tu elección en la UI** > `MYBRAIN_VAULT_PATH` > `~/Documents/MyBrain`.
+*Reset to default* borra tu elección.
+
+**Validaciones** (para que el resto del sistema no apunte a cualquier cosa): la
+ruta debe existir, ser un directorio, contener notas `.md` o `.obsidian`, y se
+rechazan rutas demasiado amplias (raíz del disco o tu carpeta de usuario) —
+si no, la lectura del vault y la escritura de *Regenerate* tendrían al alcance
+archivos que no son notas.
+
+Endpoints: `GET /api/vault/config`, `GET /api/vault/inspect?path=`,
+`GET /api/vault/detect`, `POST /api/vault/config`, `POST /api/vault/config/reset`.
 
 ## Knowledge snapshot (Drive) y Data Quality Center
 

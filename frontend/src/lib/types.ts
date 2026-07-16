@@ -274,6 +274,31 @@ export interface QualityIssue {
   correctionRequiresWrite: boolean
 }
 
+// ── Vault connection (per-user) ──────────────────────────────────────────
+
+export type VaultSource = 'user' | 'env' | 'default'
+
+export interface VaultStatus {
+  path: string
+  exists: boolean
+  isDirectory: boolean
+  looksLikeVault: boolean
+  hasObsidian: boolean
+  hasClaudeDir: boolean
+  markdownCount: number
+  folders: string[]
+  problem?: string
+}
+
+export interface VaultConfigResponse {
+  source: VaultSource
+  status: VaultStatus
+}
+
+export interface VaultDetectResponse {
+  candidates: VaultStatus[]
+}
+
 export interface QualityScan {
   status: 'ok' | 'not_configured' | 'error'
   generatedAt: string

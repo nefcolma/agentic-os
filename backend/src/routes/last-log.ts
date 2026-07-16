@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { Router } from 'express'
 import { config } from '../config/index.js'
+import { getVaultPath } from '../services/vault-settings.js'
 import { tailFile } from '../utils/tail.js'
 import { BadRequestError, parseBoundedInt } from '../utils/params.js'
 
@@ -23,7 +24,7 @@ export const lastLogRouter = Router()
 lastLogRouter.get('/api/last-log', async (req, res, next) => {
   try {
     const lines = parseBoundedInt('lines', req.query.lines, config.logs.lastLogDefaultLines, 1, 5_000)
-    const logAbs = path.join(config.vaultPath, NIGHTLY_LOG_RELATIVE)
+    const logAbs = path.join(getVaultPath(), NIGHTLY_LOG_RELATIVE)
     const tail = await tailFile(logAbs, lines, config.logs.maxRunLogBytes)
 
     if (tail === null) {

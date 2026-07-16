@@ -5,6 +5,7 @@ import { config } from '../config/index.js'
 import { redactSecrets } from '../utils/redact.js'
 import { sanitizedClaudeEnv } from '../runners/claude.js'
 import { resolveVaultDoc } from './knowledge.js'
+import { getVaultPath } from './vault-settings.js'
 
 /**
  * Regenerate (PRD Pattern B) — safe two-phase note refresh:
@@ -54,7 +55,7 @@ function runClaudeReadOnly(prompt: string): Promise<ClaudeResult> {
     const child = spawn(
       config.claudeBin,
       ['-p', prompt, '--output-format', 'text', '--allowedTools', 'Read'],
-      { cwd: config.vaultPath, env: sanitizedClaudeEnv(), stdio: ['ignore', 'pipe', 'pipe'], shell: false },
+      { cwd: getVaultPath(), env: sanitizedClaudeEnv(), stdio: ['ignore', 'pipe', 'pipe'], shell: false },
     )
     const out: Buffer[] = []
     const err: Buffer[] = []
