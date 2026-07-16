@@ -2,6 +2,7 @@ import { Router } from 'express'
 import {
   getKnowledgeSources,
   getKnowledgeDoc,
+  getKnowledgeGraph,
   exportBakedBundle,
 } from '../services/knowledge.js'
 import type { KnowledgeSourceId } from '../services/knowledge.js'
@@ -38,6 +39,17 @@ knowledgeRouter.get('/api/knowledge/doc', async (req, res, next) => {
       return
     }
     res.json({ doc })
+  } catch (err) {
+    next(err)
+  }
+})
+
+/** Node/link graph for the knowledge map. Query: source=drive|vault (default drive). */
+knowledgeRouter.get('/api/knowledge/graph', async (req, res, next) => {
+  try {
+    const source = req.query.source
+    const sourceId: KnowledgeSourceId = source === 'vault' ? 'vault' : 'drive'
+    res.json(await getKnowledgeGraph(sourceId))
   } catch (err) {
     next(err)
   }

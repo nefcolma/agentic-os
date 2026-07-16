@@ -200,12 +200,79 @@ separated sources**. Concretely:
   lines = critical; 1 missing-SKU; 77 duplicated partner labels). `git status`
   on the vault: unchanged — the extraction and features wrote nothing to it.
 
-### Phases 6–8 — not yet built
-- **6** — Full visual pass (richer command-center layout, more charts).
-- **7** — Document cards + Markdown modal (Pattern A read, Pattern B
-  "Regenerate" with preview/diff/confirm before any overwrite, "Open in
-  Obsidian" URI).
-- **8** — Tests, security review, final docs.
+### Phase 6 — Command-center shell + Knowledge Map *(this entry)*
+Requested: combine the reference dashboard's interface (top bar, left icon
+nav, orbital "knowledge map" constellation) with the panels already built.
+
+- **Shell** (`components/Shell.tsx`): a left icon-rail nav (lucide-react icons)
+  + top bar (brand, version, active-view label, live system status with vault
+  counts). `App.tsx` refactored from one long scroll into six navigable
+  **views** — Command (System + Vault + Nightly log), Knowledge Map, Actions
+  (Actions + Run Log), Odoo, Data Quality, Knowledge — each mounting the
+  existing, unchanged panels.
+- **Knowledge Map** (`modules/KnowledgeMap.tsx`): an SVG constellation driven
+  by real data. `GET /api/knowledge/graph?source=drive|vault` builds
+  nodes/links: structural links (core→hub→doc) are always real, and gold
+  **cross-reference** links come from actual `[[wikilinks]]` parsed from
+  document content — never invented (Drive shows 0 today since the linked docs
+  are stubs; the vault shows 16 real cross-links). Two layouts: **Rings**
+  (deterministic trig) and **Constellation** (a small seeded force relaxation,
+  no d3 dependency), with a spin slider + auto-rotate, a file-names toggle,
+  hover neighbor-highlighting, and click-to-open (reuses the shared `DocModal`,
+  resolving each doc's real vault path for "Open in Obsidian").
+- `DocModal` extracted from `KnowledgePanel` into `components/DocModal.tsx` so
+  both the knowledge browser and the map open documents the same way; added
+  Esc-to-close.
+- **Verified in-browser**: all six views render; the Drive map shows 26
+  nodes / 11 hubs, the vault map shows the 16 gold cross-links; both layouts
+  work; clicking a map node opens the real note with the correct
+  `obsidian://open?vault=MyBrain&file=…` URI; no console errors; typecheck +
+  build clean; the vault is untouched.
+
+### Phase 7 — Document cards: "Regenerate" with preview/diff/confirm *(this entry)*
+The PRD's Pattern B ("a Regenerate button that triggers a `claude -p` call to
+overwrite and refresh the note"), implemented under the vault's rule 9 — never
+overwrite silently; preview, show a diff, require explicit confirmation.
+
+**Two-phase design (and the one deliberate deviation from the PRD):**
+- **Preview** (`POST /api/regenerate/preview`) — `claude -p` runs **read-only**
+  (`--output-format text --allowedTools Read`, cwd = vault, sanitized env) and
+  emits a proposed refresh on stdout. Nothing is written. A fixed prompt
+  template instructs it to preserve frontmatter, invent nothing, and emit only
+  the markdown. The only per-request input is the note id, resolved through the
+  same validated vault-path guard used by the doc reader.
+- **Confirm** — the modal renders a line-level diff (LCS, `lib/diff.ts`) with
+  +added/−removed counts. Nothing happens without an explicit click.
+- **Apply** (`POST /api/regenerate/apply`) — the backend writes **exactly the
+  approved bytes** and first backs up the previous version to
+  `backend/data/regenerate-backups/` (gitignored); the change then lands in the
+  vault's own git for review/revert.
+
+*Deviation, on purpose:* the PRD implies the overwrite itself should be a
+`claude -p` call. Vault rule 9 requires approving the **exact** content, which a
+second, non-deterministic Claude write could not guarantee. So generation goes
+through Claude and the write applies the already-approved bytes. Documented in
+README.
+
+**Safeguards:** `.md`-only, inside-vault-only (path traversal + absolute paths
+rejected), empty/too-short content refused, backup always taken, and this is
+the *only* place the dashboard writes to the vault.
+
+**Verification:**
+- `regenerateApply` unit-tested against a **scratch vault** (never the real
+  one): writes approved bytes exactly + backs up the previous version; rejects
+  empty/short content leaving the note untouched; rejects `../` traversal,
+  absolute paths, non-`.md`, and missing notes. 5/5 pass.
+- `lineDiff` unit-tested: LCS keeps shared lines, reports +2/−1 correctly.
+- Preview exercised end-to-end against the real CLI: returns `502 CLI_FAILED`
+  with the actual 401 and an actionable hint, and the UI renders it with a Back
+  button — **zero writes to the vault**.
+- **Known blocker:** the full preview→diff→apply path cannot be demonstrated
+  until the machine's `claude` credential is fixed (`claude auth login`); the
+  same 401 first found in Phase 4 still stands.
+
+### Phase 8 — not yet built
+Tests, security review, final docs.
 
 ---
 

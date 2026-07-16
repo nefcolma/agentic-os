@@ -1,101 +1,8 @@
-import { useEffect, useState } from 'react'
-import { useApiGet, apiGet, apiPost } from '../lib/api'
-import type {
-  KnowledgeSourcesResponse,
-  KnowledgeSource,
-  KnowledgeSourceId,
-  KnowledgeDocMeta,
-  KnowledgeDocContent,
-} from '../lib/types'
+import { useState } from 'react'
+import { useApiGet, apiPost } from '../lib/api'
+import type { KnowledgeSourcesResponse, KnowledgeSource, KnowledgeSourceId, KnowledgeDocMeta } from '../lib/types'
 import { Panel, Pill } from '../components/ui'
-import { Markdown } from '../lib/markdown'
-
-function vaultNameFromPath(p: unknown): string {
-  return typeof p === 'string' ? (p.split('/').filter(Boolean).pop() ?? 'MyBrain') : 'MyBrain'
-}
-
-function DocModal({
-  source,
-  doc,
-  vaultName,
-  onClose,
-}: {
-  source: KnowledgeSourceId
-  doc: KnowledgeDocMeta
-  vaultName: string
-  onClose: () => void
-}) {
-  const [state, setState] = useState<{ status: 'loading' | 'error'; message?: string } | { status: 'ok'; data: KnowledgeDocContent }>(
-    { status: 'loading' },
-  )
-
-  useEffect(() => {
-    let cancelled = false
-    setState({ status: 'loading' })
-    apiGet<{ doc: KnowledgeDocContent }>(`/api/knowledge/doc?source=${source}&id=${encodeURIComponent(doc.id)}`)
-      .then((r) => !cancelled && setState({ status: 'ok', data: r.doc }))
-      .catch((e) => !cancelled && setState({ status: 'error', message: e instanceof Error ? e.message : String(e) }))
-    return () => {
-      cancelled = true
-    }
-  }, [source, doc.id])
-
-  const obsidianUri =
-    source === 'vault'
-      ? `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(doc.path.replace(/\.md$/i, ''))}`
-      : null
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:p-8"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-3xl rounded-lg border border-neutral-800 bg-neutral-950 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <header className="flex items-start justify-between gap-3 border-b border-neutral-800 p-4">
-          <div className="min-w-0">
-            <h3 className="truncate font-mono text-sm font-bold text-neutral-100">{doc.name}</h3>
-            <p className="mt-0.5 truncate font-mono text-[10px] text-neutral-500">
-              {source === 'drive' ? 'Drive · obsidianbus' : 'Vault · MyBrain'} · {doc.path}
-            </p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {obsidianUri && (
-              <a
-                href={obsidianUri}
-                className="rounded border border-neutral-700 px-2 py-1 font-mono text-[10px] tracking-wider text-neutral-300 uppercase hover:bg-neutral-800"
-              >
-                Open in Obsidian
-              </a>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded border border-neutral-700 px-2 py-1 font-mono text-[10px] tracking-wider text-neutral-400 uppercase hover:bg-neutral-800"
-            >
-              Close
-            </button>
-          </div>
-        </header>
-        <div className="max-h-[70vh] overflow-y-auto p-5">
-          {state.status === 'loading' && <p className="font-mono text-xs text-neutral-500">Loading document…</p>}
-          {state.status === 'error' && <p className="font-mono text-xs text-red-400">{state.message}</p>}
-          {state.status === 'ok' && state.data.content !== null && <Markdown text={state.data.content} />}
-          {state.status === 'ok' && state.data.content === null && (
-            <div className="space-y-2">
-              <p className="text-[13px] text-neutral-300">{doc.summary}</p>
-              <p className="font-mono text-[11px] text-amber-400">
-                {state.data.message ?? 'Content not extracted in this snapshot.'}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+import { DocModal, vaultNameFromPath } from '../components/DocModal'
 
 function SourceBody({
   source,
@@ -212,7 +119,9 @@ export function KnowledgePanel() {
           {active === 'drive' && current?.available && (
             <p className="font-mono text-[10px] text-neutral-600">
               read-only snapshot · owner {String(current.meta.owner ?? '—')} · baked{' '}
-              {typeof current.meta.generatedAt === 'string' ? current.meta.generatedAt.slice(0, 16).replace('T', ' ') : '—'}
+              {typeof current.meta.generatedAt === 'string'
+                ? current.meta.generatedAt.slice(0, 16).replace('T', ' ')
+                : '—'}
             </p>
           )}
           {exportMsg && <p className="font-mono text-[10px] break-all text-neutral-500">{exportMsg}</p>}

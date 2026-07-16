@@ -81,6 +81,8 @@ npm run build      # compila backend (tsc) y frontend (vite build)
 - [x] Fase 4 — Acciones Claude (`/api/run/*`, `/api/actions`; GHL e inbox-classify en "not configured")
 - [x] Fase 5 — Integración Odoo read-only (`/api/odoo/*`, validación de params, datos reales)
 - [x] Fase 5.5 — Visor de conocimiento (Drive snapshot + vault, `/api/knowledge/*`) y Data Quality Center (`/api/quality/issues`)
+- [x] Fase 6 — Shell (barra superior + nav lateral) con vistas navegables y Knowledge Map orbital (`/api/knowledge/graph`)
+- [x] Fase 7 — Document cards + "Regenerate" con preview/diff y confirmación explícita (`/api/regenerate/*`)
 - [ ] Fase 6 — Dashboard visual completo
 - [ ] Fase 7 — Document cards y modal Markdown
 - [ ] Fase 8 — Pruebas, seguridad y documentación final
@@ -110,6 +112,31 @@ los 11 campos de revisión (tipo, severidad, estado, confianza, fuente, fecha,
 evidencia, impacto, métricas afectadas, responsable, recomendación). **Solo
 detecta y recomienda** — nunca escribe en Odoo; cualquier corrección quedaría
 marcada como acción de escritura que requiere confirmación explícita.
+
+## Regenerate (Pattern B) — cómo se protege tu vault
+
+El botón **Regenerate** del modal de una nota del vault **nunca sobrescribe en
+silencio**. El flujo tiene dos fases separadas:
+
+1. **Preview** (`POST /api/regenerate/preview`) — corre `claude -p` en modo
+   **solo-lectura** (`--allowedTools Read`), que lee la nota y emite una
+   propuesta por stdout. **No escribe nada.**
+2. **Confirmación** — la UI muestra un **diff línea a línea** (+añadidas /
+   −eliminadas) de la nota actual vs. la propuesta. Sin tu clic explícito en
+   *Confirm overwrite*, no pasa nada.
+3. **Apply** (`POST /api/regenerate/apply`) — el backend escribe **exactamente
+   los bytes que aprobaste** y guarda un **backup** de la versión previa en
+   `backend/data/regenerate-backups/` (gitignored). El cambio queda en el git
+   de tu vault para que lo revises/revirtas.
+
+**Por qué el apply lo hace el backend y no un segundo `claude -p`:** el PRD
+sugiere que Regenerate dispare un `claude -p` que sobrescriba, pero la regla 9
+del vault exige aprobar el **contenido exacto** antes de escribir. Un segundo
+`claude -p` podría generar algo distinto a lo que viste en el diff. Por eso la
+*generación* va por Claude y la *escritura* aplica los bytes ya aprobados.
+
+Salvaguardas: solo notas `.md` dentro del vault (anti path-traversal), se
+rechaza contenido vacío o demasiado corto, y siempre hay backup.
 
 ## Troubleshooting
 

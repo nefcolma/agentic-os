@@ -250,14 +250,25 @@ async function vaultSource(): Promise<KnowledgeSource> {
   }
 }
 
-/** Reads one vault note fresh from disk; guards against path traversal. */
-async function vaultDoc(id: string): Promise<KnowledgeDocContent | null> {
+/**
+ * Decodes a vault doc id to a validated { relPath, absPath }, guarding against
+ * path traversal and restricting to .md files inside the vault. Shared by the
+ * doc reader and the regenerate service.
+ */
+export function resolveVaultDoc(id: string): { relPath: string; absPath: string } | null {
   const relPath = decodeVaultId(id)
   if (relPath === null) return null
   const abs = path.resolve(config.vaultPath, relPath)
-  // Must stay inside the vault and be a .md file.
   if (abs !== config.vaultPath && !abs.startsWith(config.vaultPath + path.sep)) return null
   if (!abs.toLowerCase().endsWith('.md')) return null
+  return { relPath, absPath: abs }
+}
+
+/** Reads one vault note fresh from disk; guards against path traversal. */
+async function vaultDoc(id: string): Promise<KnowledgeDocContent | null> {
+  const resolved = resolveVaultDoc(id)
+  if (!resolved) return null
+  const { relPath, absPath: abs } = resolved
   try {
     const [raw, stat] = await Promise.all([fsp.readFile(abs, 'utf8'), fsp.stat(abs)])
     return {
@@ -288,6 +299,112 @@ export async function getKnowledgeDoc(
   id: string,
 ): Promise<KnowledgeDocContent | null> {
   return source === 'drive' ? driveDoc(id) : vaultDoc(id)
+}
+
+// ── Knowledge graph (for the constellation / rings visualization) ──────────
+
+export interface GraphNode {
+  id: string
+  type: 'core' | 'hub' | 'doc'
+  label: string
+  color: string
+  category?: string
+  source?: KnowledgeSourceId
+  docId?: string
+  path?: string
+  contentExtracted?: boolean
+}
+export interface GraphLink {
+  source: string
+  target: string
+  kind: 'spine' | 'branch' | 'ref'
+}
+export interface KnowledgeGraph {
+  source: KnowledgeSourceId
+  available: boolean
+  coreId: string
+  coreLabel: string
+  nodes: GraphNode[]
+  links: GraphLink[]
+  stats: { nodes: number; hubs: number; docs: number; crossRefs: number }
+}
+
+const norm = (s: string): string => s.replace(/\.md$/i, '').trim().toLowerCase().replace(/[\s_-]+/g, ' ')
+
+/**
+ * Builds a node/link graph for one source. Structure links (core→hub→doc) are
+ * always real; cross-reference links come from actual `[[wikilinks]]` parsed
+ * from document content (only where content is available) — never invented.
+ */
+export async function getKnowledgeGraph(sourceId: KnowledgeSourceId): Promise<KnowledgeGraph> {
+  const sources = await getKnowledgeSources()
+  const src = sources.find((s) => s.id === sourceId)
+  const coreLabel = sourceId === 'drive' ? 'INDEX.md' : 'CLAUDE.md'
+  const coreId = 'core'
+  const nodes: GraphNode[] = [{ id: coreId, type: 'core', label: coreLabel, color: '#e8c56a' }]
+  const links: GraphLink[] = []
+
+  if (!src || !src.available) {
+    return { source: sourceId, available: false, coreId, coreLabel, nodes, links, stats: { nodes: 1, hubs: 0, docs: 0, crossRefs: 0 } }
+  }
+
+  const nameToNode = new Map<string, string>()
+  let hubs = 0
+  let docCount = 0
+  for (const cat of src.categories) {
+    const hubId = `hub-${cat.id}`
+    nodes.push({ id: hubId, type: 'hub', label: cat.name, color: cat.color, category: cat.id })
+    links.push({ source: coreId, target: hubId, kind: 'spine' })
+    hubs++
+    for (const doc of cat.docs) {
+      const nodeId = `doc-${doc.id}`
+      nodes.push({
+        id: nodeId,
+        type: 'doc',
+        label: doc.name.replace(/\.md$/i, ''),
+        color: cat.color,
+        category: cat.id,
+        source: sourceId,
+        docId: doc.id,
+        path: doc.path,
+        contentExtracted: doc.contentExtracted,
+      })
+      links.push({ source: hubId, target: nodeId, kind: 'branch' })
+      nameToNode.set(norm(doc.name), nodeId)
+      docCount++
+    }
+  }
+
+  // Cross-references from real [[wikilinks]] in available content.
+  let crossRefs = 0
+  const seenPairs = new Set<string>()
+  for (const cat of src.categories) {
+    for (const doc of cat.docs) {
+      if (sourceId === 'drive' && !doc.contentExtracted) continue
+      const content = await getKnowledgeDoc(sourceId, doc.id)
+      if (!content || content.content === null) continue
+      const fromId = `doc-${doc.id}`
+      for (const m of content.content.matchAll(/\[\[([^\]|#]+)/g)) {
+        const target = nameToNode.get(norm(m[1] ?? ''))
+        const pair = `${fromId}->${target}`
+        if (target && target !== fromId && !seenPairs.has(pair)) {
+          seenPairs.add(pair)
+          links.push({ source: fromId, target, kind: 'ref' })
+          crossRefs++
+        }
+      }
+    }
+  }
+
+  return {
+    source: sourceId,
+    available: true,
+    coreId,
+    coreLabel,
+    nodes,
+    links,
+    stats: { nodes: nodes.length, hubs, docs: docCount, crossRefs },
+  }
 }
 
 export interface ExportResult {

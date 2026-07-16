@@ -221,6 +221,32 @@ export interface KnowledgeDocContent extends KnowledgeDocMeta {
   message?: string
 }
 
+export interface GraphNode {
+  id: string
+  type: 'core' | 'hub' | 'doc'
+  label: string
+  color: string
+  category?: string
+  source?: KnowledgeSourceId
+  docId?: string
+  path?: string
+  contentExtracted?: boolean
+}
+export interface GraphLink {
+  source: string
+  target: string
+  kind: 'spine' | 'branch' | 'ref'
+}
+export interface KnowledgeGraph {
+  source: KnowledgeSourceId
+  available: boolean
+  coreId: string
+  coreLabel: string
+  nodes: GraphNode[]
+  links: GraphLink[]
+  stats: { nodes: number; hubs: number; docs: number; crossRefs: number }
+}
+
 // ── Data Quality Center ──────────────────────────────────────────────────
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
