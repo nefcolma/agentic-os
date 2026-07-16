@@ -305,8 +305,49 @@ vault's `.claude/`) — all **without restarting the backend**, proving the lazy
 refactor. Rejections confirmed for a missing path, the home dir, and a folder
 with no notes. Reset restored the original vault (4/3/1).
 
-### Phase 8 — not yet built
-Tests, security review, final docs.
+### Phase 8 — Tests, security review, final docs *(this entry)*
+
+**Test suite.** The per-phase checks that had lived in scratch files are now a
+real suite in `backend/test/`, run with `npm test` (node:test, no new deps,
+builds first): security guards, secret redaction + claude env sanitization,
+`regenerateApply` against a scratch vault, and vault-path validation. **21/21
+pass.**
+
+**Security review** → [SECURITY.md](SECURITY.md). The threat model is written
+around the one sentence the whole project rests on: *nothing but this machine's
+loopback can reach the backend* — it has no auth precisely because of that.
+
+Findings:
+- **S1 · Critical (open, deploy decision)** — the `vercel.json` on `main`
+  publishes the backend. With `ODOO_*` set in the host env, `/api/odoo/*` would
+  serve real financials unauthenticated; and it cannot work anyway (no vault, no
+  `claude`, no `python3`+`odoo_sync.py`, ephemeral FS, loopback guard). Auth
+  would not fix the functional half. Recommendation: keep the backend local and
+  front it with a tunnel + identity proxy (Cloudflare Access / Tailscale) if a
+  URL with real data and real users is wanted.
+- **S2 · High (fixed)** — **real CSRF hole, reproduced**: a cross-site `<form>`
+  POST (no preflight) hit `POST /api/run/*` and started a vault-writing `claude`
+  run — verified HTTP 202 against the live server. Fixed with `csrfGuard`
+  (custom `X-Requested-By` header forces a preflight that fails cross-origin,
+  plus `Origin`/`Sec-Fetch-Site` checks); same PoC now returns 403.
+- **S3 · Medium (fixed)** — DNS rebinding; `hostGuard` rejects non-localhost
+  `Host`.
+- **S4 · Medium (fixed)** — over-broad vault paths refused.
+- **S5 · Medium (mitigated by design)** — the Regenerate write path.
+- **S6 · Low (diagnosed)** — the Vercel build crash is a **TypeScript 7 ↔
+  `@vercel/backends`** incompatibility: TS7 (native port) no longer exposes
+  `ts.sys` (verified `undefined`), and `@vercel/backends` calls
+  `ts.readConfigFile(tsconfig, ts.sys.readFile)`. Not a defect in this codebase.
+- **S7 · Info (open, user action)** — the machine's `claude` credential is
+  invalid (401); blocks `/api/run/*` and Regenerate previews, and is why the
+  nightly cron logs "Not logged in". Needs `claude auth login`.
+
+**Docs.** README gained a Security section (with the "don't publish the backend"
+guidance and the tunnel alternative) and `npm test`; SECURITY.md is new.
+
+### Status
+Phases 0–8 complete. Open items are not code: the deploy/auth decision (S1) and
+the CLI credential (S7).
 
 ---
 

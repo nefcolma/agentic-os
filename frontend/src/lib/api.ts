@@ -42,10 +42,18 @@ export async function apiGet<T>(path: string): Promise<T> {
   return request<T>(path)
 }
 
+/**
+ * Marks a request as coming from this dashboard. A cross-site <form> cannot set
+ * a custom header, so requiring it makes the backend's state-changing endpoints
+ * unreachable from other sites (the browser must preflight, which fails).
+ */
+const REQUESTED_BY = { 'X-Requested-By': 'agentic-os' } as const
+
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   return request<T>(path, {
     method: 'POST',
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    headers:
+      body === undefined ? { ...REQUESTED_BY } : { 'Content-Type': 'application/json', ...REQUESTED_BY },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
 }

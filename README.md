@@ -68,9 +68,29 @@ npm run dev        # backend (tsx watch) + frontend (vite) concurrentes
 Otros comandos:
 
 ```bash
+npm test           # 21 pruebas: guards de seguridad, redacción, regenerate, validación de vault
 npm run typecheck  # TypeScript estricto en ambos workspaces
 npm run build      # compila backend (tsc) y frontend (vite build)
 ```
+
+## Seguridad — léelo antes de exponer nada
+
+Este dashboard **no tiene autenticación, a propósito**: el PRD lo permite solo
+porque el backend es inalcanzable salvo desde `127.0.0.1`. Toda la seguridad del
+proyecto descansa en esa frase.
+
+- **No despliegues el backend en un host público** (Vercel u otro). Sin auth
+  expondría tus finanzas reales de Odoo, y además no funcionaría: en serverless
+  no hay vault, ni CLI de `claude`, ni `python3 odoo_sync.py`.
+- ¿Quieres una URL con datos reales y control de acceso? Deja el backend en tu
+  máquina y ponle delante un túnel + proxy de identidad (Cloudflare Tunnel +
+  Access, o Tailscale). Ahí defines el super-admin y agregas usuarios por email,
+  sin mover datos ni escribir una capa de auth.
+- Aun en local, el backend rechaza peticiones cross-site que cambien estado
+  (`X-Requested-By` + chequeo de `Origin`/`Sec-Fetch-Site`) y peticiones cuyo
+  `Host` no sea localhost (anti DNS-rebinding).
+
+Detalle completo, hallazgos y riesgos residuales: **[SECURITY.md](SECURITY.md)**.
 
 ## Estado de fases
 
@@ -83,6 +103,8 @@ npm run build      # compila backend (tsc) y frontend (vite build)
 - [x] Fase 5.5 — Visor de conocimiento (Drive snapshot + vault, `/api/knowledge/*`) y Data Quality Center (`/api/quality/issues`)
 - [x] Fase 6 — Shell (barra superior + nav lateral) con vistas navegables y Knowledge Map orbital (`/api/knowledge/graph`)
 - [x] Fase 7 — Document cards + "Regenerate" con preview/diff y confirmación explícita (`/api/regenerate/*`)
+- [x] Vault conectable por usuario (Settings → runtime, sin reiniciar)
+- [x] Fase 8 — Pruebas (`npm test`), hardening anti-CSRF/DNS-rebinding y revisión de seguridad ([SECURITY.md](SECURITY.md))
 - [ ] Fase 6 — Dashboard visual completo
 - [ ] Fase 7 — Document cards y modal Markdown
 - [ ] Fase 8 — Pruebas, seguridad y documentación final

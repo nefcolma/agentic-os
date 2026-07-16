@@ -10,6 +10,7 @@ import { knowledgeRouter } from './routes/knowledge.js'
 import { qualityRouter } from './routes/quality.js'
 import { regenerateRouter } from './routes/regenerate.js'
 import { vaultConfigRouter } from './routes/vault-config.js'
+import { hostGuard, csrfGuard } from './middleware/security.js'
 
 const apiNotFound: RequestHandler = (_req, res) => {
   res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Unknown API route' } })
@@ -25,6 +26,12 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
 export function createApp(): express.Express {
   const app = express()
   app.disable('x-powered-by')
+
+  // Guards run before any route: binding to loopback keeps the network out, but
+  // a page in the user's own browser can still reach us. hostGuard blocks DNS
+  // rebinding; csrfGuard blocks cross-site state-changing requests.
+  app.use(hostGuard)
+  app.use(csrfGuard)
   app.use(express.json({ limit: '1mb' }))
 
   app.use(healthRouter)
