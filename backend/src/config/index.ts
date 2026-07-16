@@ -15,25 +15,19 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1'])
 export interface AppConfig {
   host: string
   port: number
-  /** Absolute path to the MyBrain Obsidian vault (external data source). */
-  vaultPath: string
-  /** Claude Code CLI binary; spawned processes use cwd = vaultPath. */
+  /**
+   * Fallback vault path used only when the user has not connected one yet.
+   * The ACTIVE vault is runtime state — always read it through
+   * `services/vault-settings.ts` (getVaultPath / vaultPaths), never from here,
+   * so the user can point the dashboard at their own vault without a restart.
+   */
+  defaultVaultPath: string
+  /** Claude Code CLI binary; spawned processes use cwd = the active vault. */
   claudeBin: string
   /** python3 binary used to invoke the read-only Odoo script directly. */
   pythonBin: string
-  /** Read-only Odoo script, invoked directly with python3 (never via Claude). */
-  odooScriptPath: string
-  prompts: {
-    weeklyDigestPath: string
-    /** Does not exist in the vault yet — endpoints report "not configured" until it does. */
-    inboxClassifyPath: string
-    /** Optional override file; when absent, the verbatim crontab prompt is used. */
-    nightlyConsolidationPath: string
-    ghlSyncColmaPath: string
-    ghlSyncUpdUrnsPath: string
-  }
-  /** ghl-sync skill directory — does not exist yet; checked for "not configured". */
-  ghlSyncSkillDir: string
+  /** Local, gitignored dir for snapshots, exports, backups and settings.json. */
+  dataDir: string
   knowledge: {
     /** Local, gitignored snapshot of the shared Drive knowledge base (agent-baked). */
     snapshotPath: string
@@ -119,40 +113,21 @@ function buildConfig(): AppConfig {
     )
   }
 
-  const vaultPath = path.resolve(
+  // Only a FALLBACK: the active vault is runtime state (vault-settings.ts).
+  const defaultVaultPath = path.resolve(
     expandTilde(process.env.MYBRAIN_VAULT_PATH ?? path.join(os.homedir(), 'Documents', 'MyBrain')),
   )
-  const vaultClaudeDir = path.join(vaultPath, '.claude')
+  const dataDir = path.resolve(fileURLToPath(new URL('../../data', import.meta.url)))
 
   return {
     host,
     // Named BACKEND_PORT (not PORT) on purpose: dev tooling injects a generic
     // PORT for the frontend dev server, which must not hijack the backend bind.
     port: intFromEnv('BACKEND_PORT', 8790, 1, 65535),
-    vaultPath,
+    defaultVaultPath,
     claudeBin: (process.env.CLAUDE_BIN ?? 'claude').trim(),
     pythonBin: (process.env.PYTHON_BIN ?? 'python3').trim(),
-    odooScriptPath: path.resolve(
-      expandTilde(
-        process.env.ODOO_SCRIPT_PATH ?? path.join(vaultClaudeDir, 'skills', 'odoo-sync', 'odoo_sync.py'),
-      ),
-    ),
-    prompts: {
-      weeklyDigestPath: path.resolve(
-        expandTilde(
-          process.env.WEEKLY_DIGEST_PROMPT_PATH ?? path.join(vaultClaudeDir, 'prompts', 'weekly-digest.txt'),
-        ),
-      ),
-      inboxClassifyPath: path.resolve(
-        expandTilde(
-          process.env.INBOX_CLASSIFY_PROMPT_PATH ?? path.join(vaultClaudeDir, 'prompts', 'inbox-classify.txt'),
-        ),
-      ),
-      nightlyConsolidationPath: path.join(vaultClaudeDir, 'prompts', 'nightly-consolidation.txt'),
-      ghlSyncColmaPath: path.join(vaultClaudeDir, 'prompts', 'ghl-sync-colma.txt'),
-      ghlSyncUpdUrnsPath: path.join(vaultClaudeDir, 'prompts', 'ghl-sync-upd-urns.txt'),
-    },
-    ghlSyncSkillDir: path.join(vaultClaudeDir, 'skills', 'ghl-sync'),
+    dataDir,
     knowledge: {
       snapshotPath: path.resolve(
         expandTilde(

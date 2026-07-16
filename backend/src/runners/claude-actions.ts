@@ -3,10 +3,14 @@ import { config } from '../config/index.js'
 import { makeClaudeRunDefinition } from './claude.js'
 import type { ClaudeActionSpec } from './claude.js'
 import type { RunDefinition } from '../services/run-manager.js'
+import { getVaultPath, vaultPaths } from '../services/vault-settings.js'
 
 /**
  * The fixed catalog of Claude actions. Every /api/run/* endpoint maps to
  * exactly one spec here — there is no way to run anything not in this file.
+ *
+ * Vault-derived values (cwd, prompt paths, skill dirs) are resolved LAZILY, so
+ * the catalog always follows whichever vault the user has connected.
  */
 
 /**
@@ -41,25 +45,25 @@ export const CLAUDE_ACTION_SPECS: ClaudeActionSpec[] = [
     description:
       'Classifies 0_Inbox notes into PARA folders applying the classification + recency-weighting skills.',
     mutexGroup: 'vault-write',
-    promptSource: { type: 'file', path: config.prompts.inboxClassifyPath },
+    promptSource: () => ({ type: 'file', path: vaultPaths().prompts.inboxClassify }),
     allowedTools: VAULT_WRITE_TOOLS,
-    cwd: config.vaultPath,
+    cwd: () => getVaultPath(),
     timeoutMs: config.timeouts.claudeRunMs,
-    checkMissing: () => missingFile('prompt file', config.prompts.inboxClassifyPath),
+    checkMissing: () => missingFile('prompt file', vaultPaths().prompts.inboxClassify),
   },
   {
     kind: 'nightly-consolidation',
     title: 'Nightly Consolidation',
     description: 'Runs the same consolidation prompt the 23:00 cron uses, on demand.',
     mutexGroup: 'vault-write',
-    promptSource: {
+    promptSource: () => ({
       type: 'verified-inline',
       text: NIGHTLY_CONSOLIDATION_PROMPT_VERBATIM,
       provenance: 'crontab entry (verbatim, audited 2026-07-10)',
-      overrideFilePath: config.prompts.nightlyConsolidationPath,
-    },
+      overrideFilePath: vaultPaths().prompts.nightlyConsolidation,
+    }),
     allowedTools: VAULT_WRITE_TOOLS,
-    cwd: config.vaultPath,
+    cwd: () => getVaultPath(),
     timeoutMs: config.timeouts.claudeRunMs,
     checkMissing: () => [],
   },
@@ -69,14 +73,14 @@ export const CLAUDE_ACTION_SPECS: ClaudeActionSpec[] = [
     description:
       'Generates the UPD Urns weekly digest from read-only Odoo pulls (same prompt as the Monday cron).',
     mutexGroup: 'vault-write',
-    promptSource: { type: 'file', path: config.prompts.weeklyDigestPath },
+    promptSource: () => ({ type: 'file', path: vaultPaths().prompts.weeklyDigest }),
     // Bash is scoped to the odoo-sync script invocation only.
     allowedTools: 'Read,Write,Bash(python3 .claude/skills/odoo-sync/odoo_sync.py:*)',
-    cwd: config.vaultPath,
+    cwd: () => getVaultPath(),
     timeoutMs: config.timeouts.claudeRunMs,
     checkMissing: () => [
-      ...missingFile('prompt file', config.prompts.weeklyDigestPath),
-      ...missingFile('odoo script', config.odooScriptPath),
+      ...missingFile('prompt file', vaultPaths().prompts.weeklyDigest),
+      ...missingFile('odoo script', vaultPaths().odooScript),
       ...missingEnv(['ODOO_URL', 'ODOO_USERNAME', 'ODOO_API_KEY']),
     ],
   },
@@ -85,14 +89,14 @@ export const CLAUDE_ACTION_SPECS: ClaudeActionSpec[] = [
     title: 'GHL Sync — Colma',
     description: 'Read/sync of the Colma GHL pipeline into the vault (never writes to GHL).',
     mutexGroup: 'vault-write',
-    promptSource: { type: 'file', path: config.prompts.ghlSyncColmaPath },
+    promptSource: () => ({ type: 'file', path: vaultPaths().prompts.ghlSyncColma }),
     // Placeholder scope — revisit when the ghl-sync skill lands in the vault.
     allowedTools: 'Read,Write',
-    cwd: config.vaultPath,
+    cwd: () => getVaultPath(),
     timeoutMs: config.timeouts.claudeRunMs,
     checkMissing: () => [
-      ...missingFile('skill', config.ghlSyncSkillDir),
-      ...missingFile('prompt file', config.prompts.ghlSyncColmaPath),
+      ...missingFile('skill', vaultPaths().ghlSkillDir),
+      ...missingFile('prompt file', vaultPaths().prompts.ghlSyncColma),
       ...missingEnv(['GHL_API_TOKEN', 'GHL_LOCATION_ID']),
     ],
   },
@@ -101,13 +105,13 @@ export const CLAUDE_ACTION_SPECS: ClaudeActionSpec[] = [
     title: 'GHL Sync — UPD Urns',
     description: 'Read/sync of the UPD Urns GHL pipeline into the vault (never writes to GHL).',
     mutexGroup: 'vault-write',
-    promptSource: { type: 'file', path: config.prompts.ghlSyncUpdUrnsPath },
+    promptSource: () => ({ type: 'file', path: vaultPaths().prompts.ghlSyncUpdUrns }),
     allowedTools: 'Read,Write',
-    cwd: config.vaultPath,
+    cwd: () => getVaultPath(),
     timeoutMs: config.timeouts.claudeRunMs,
     checkMissing: () => [
-      ...missingFile('skill', config.ghlSyncSkillDir),
-      ...missingFile('prompt file', config.prompts.ghlSyncUpdUrnsPath),
+      ...missingFile('skill', vaultPaths().ghlSkillDir),
+      ...missingFile('prompt file', vaultPaths().prompts.ghlSyncUpdUrns),
       ...missingEnv(['GHL_API_TOKEN', 'GHL_LOCATION_ID']),
     ],
   },
@@ -117,13 +121,13 @@ export const CLAUDE_ACTION_SPECS: ClaudeActionSpec[] = [
     description:
       'Non-destructive CLI/auth check: asks for a fixed one-line reply, read-only tool allowance, no vault writes.',
     mutexGroup: 'diagnostics',
-    promptSource: {
+    promptSource: () => ({
       type: 'verified-inline',
       text: AUTH_PROBE_PROMPT,
       provenance: 'fixed diagnostic prompt (backend source)',
-    },
+    }),
     allowedTools: 'Read',
-    cwd: config.vaultPath,
+    cwd: () => getVaultPath(),
     timeoutMs: 120_000,
     checkMissing: () => [],
   },

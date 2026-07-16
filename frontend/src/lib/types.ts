@@ -221,6 +221,32 @@ export interface KnowledgeDocContent extends KnowledgeDocMeta {
   message?: string
 }
 
+export interface GraphNode {
+  id: string
+  type: 'core' | 'hub' | 'doc'
+  label: string
+  color: string
+  category?: string
+  source?: KnowledgeSourceId
+  docId?: string
+  path?: string
+  contentExtracted?: boolean
+}
+export interface GraphLink {
+  source: string
+  target: string
+  kind: 'spine' | 'branch' | 'ref'
+}
+export interface KnowledgeGraph {
+  source: KnowledgeSourceId
+  available: boolean
+  coreId: string
+  coreLabel: string
+  nodes: GraphNode[]
+  links: GraphLink[]
+  stats: { nodes: number; hubs: number; docs: number; crossRefs: number }
+}
+
 // ── Data Quality Center ──────────────────────────────────────────────────
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
@@ -246,6 +272,31 @@ export interface QualityIssue {
   proposedOwner: string | null
   recommendedAction: string
   correctionRequiresWrite: boolean
+}
+
+// ── Vault connection (per-user) ──────────────────────────────────────────
+
+export type VaultSource = 'user' | 'env' | 'default'
+
+export interface VaultStatus {
+  path: string
+  exists: boolean
+  isDirectory: boolean
+  looksLikeVault: boolean
+  hasObsidian: boolean
+  hasClaudeDir: boolean
+  markdownCount: number
+  folders: string[]
+  problem?: string
+}
+
+export interface VaultConfigResponse {
+  source: VaultSource
+  status: VaultStatus
+}
+
+export interface VaultDetectResponse {
+  candidates: VaultStatus[]
 }
 
 export interface QualityScan {

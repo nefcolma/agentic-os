@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import matter from 'gray-matter'
-import { config } from '../config/index.js'
+import { getVaultPath } from './vault-settings.js'
 
 /**
  * VaultService — deterministic, strictly read-only access to the MyBrain
@@ -95,7 +95,7 @@ function normalizeTags(value: unknown): string[] {
 }
 
 async function parseNote(absPath: string): Promise<NoteSummary> {
-  const relPath = path.relative(config.vaultPath, absPath)
+  const relPath = path.relative(getVaultPath(), absPath)
   const [raw, stat] = await Promise.all([fs.readFile(absPath, 'utf8'), fs.stat(absPath)])
 
   let data: Record<string, unknown> = {}
@@ -127,7 +127,7 @@ function sortKey(note: NoteSummary): string {
 }
 
 async function summarizeFolder(folderName: string): Promise<FolderSummary> {
-  const dirAbs = path.join(config.vaultPath, folderName)
+  const dirAbs = path.join(getVaultPath(), folderName)
   let exists = false
   try {
     exists = (await fs.stat(dirAbs)).isDirectory()
@@ -145,7 +145,7 @@ async function summarizeFolder(folderName: string): Promise<FolderSummary> {
 }
 
 async function readLastConsolidation(): Promise<LastConsolidation> {
-  const logAbs = path.join(config.vaultPath, NIGHTLY_LOG_RELATIVE)
+  const logAbs = path.join(getVaultPath(), NIGHTLY_LOG_RELATIVE)
   try {
     const stat = await fs.stat(logAbs)
     return {
@@ -161,11 +161,11 @@ async function readLastConsolidation(): Promise<LastConsolidation> {
 
 export async function getVaultSummary(): Promise<VaultSummary> {
   try {
-    const stat = await fs.stat(config.vaultPath)
-    if (!stat.isDirectory()) throw new VaultNotFoundError(config.vaultPath)
+    const stat = await fs.stat(getVaultPath())
+    if (!stat.isDirectory()) throw new VaultNotFoundError(getVaultPath())
   } catch (err) {
     if (err instanceof VaultNotFoundError) throw err
-    throw new VaultNotFoundError(config.vaultPath)
+    throw new VaultNotFoundError(getVaultPath())
   }
 
   const [inbox, projects, areas, lastConsolidation] = await Promise.all([
@@ -176,7 +176,7 @@ export async function getVaultSummary(): Promise<VaultSummary> {
   ])
 
   return {
-    vaultPath: config.vaultPath,
+    vaultPath: getVaultPath(),
     generatedAt: new Date().toISOString(),
     folders: { inbox, projects, areas },
     lastConsolidation,

@@ -1,13 +1,14 @@
 import fs from 'node:fs'
 import { createApp } from './app.js'
 import { config, SERVICE_NAME, SERVICE_VERSION } from './config/index.js'
+import { getVaultPath } from './services/vault-settings.js'
 
 const app = createApp()
 
 const server = app.listen(config.port, config.host, () => {
-  const vaultState = fs.existsSync(config.vaultPath) ? 'found' : 'MISSING'
+  const vaultState = fs.existsSync(getVaultPath()) ? 'found' : 'MISSING'
   console.log(`[${SERVICE_NAME}] v${SERVICE_VERSION} listening on http://${config.host}:${config.port}`)
-  console.log(`[${SERVICE_NAME}] vault: ${config.vaultPath} (${vaultState})`)
+  console.log(`[${SERVICE_NAME}] vault: ${getVaultPath()} (${vaultState})`)
 })
 
 server.on('error', (err: NodeJS.ErrnoException) => {

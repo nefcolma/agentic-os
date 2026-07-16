@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import { Router } from 'express'
-import { config, SERVICE_NAME, SERVICE_VERSION } from '../config/index.js'
+import { SERVICE_NAME, SERVICE_VERSION } from '../config/index.js'
+import { getVaultPath, getVaultSource } from '../services/vault-settings.js'
 
 export interface HealthResponse {
   status: 'ok'
@@ -24,8 +25,8 @@ healthRouter.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
     vault: {
-      path: config.vaultPath,
-      exists: fs.existsSync(config.vaultPath),
+      path: getVaultPath(),
+      exists: fs.existsSync(getVaultPath()),
     },
   }
   res.json(body)

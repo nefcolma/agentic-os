@@ -47,7 +47,7 @@ Variables principales (todas centralizadas en `backend/src/config/index.ts`):
 |---|---|---|
 | `BACKEND_PORT` | `8790` | Puerto del backend (no usa `PORT` para evitar colisiones con tooling del frontend) |
 | `HOST` | `127.0.0.1` | Solo loopback; el servidor rechaza cualquier otro valor |
-| `MYBRAIN_VAULT_PATH` | `~/Documents/MyBrain` | Ruta al vault |
+| `MYBRAIN_VAULT_PATH` | `~/Documents/MyBrain` | Vault **por defecto** solamente. Cada usuario conecta el suyo desde la UI (ver abajo); esa elección manda. |
 | `CLAUDE_BIN` | `claude` | Binario de Claude Code |
 | `CLAUDE_RUN_TIMEOUT_MS` | `900000` | Timeout de ejecuciones Claude |
 | `ODOO_TIMEOUT_MS` | `60000` | Timeout del script de Odoo |
@@ -81,9 +81,37 @@ npm run build      # compila backend (tsc) y frontend (vite build)
 - [x] Fase 4 — Acciones Claude (`/api/run/*`, `/api/actions`; GHL e inbox-classify en "not configured")
 - [x] Fase 5 — Integración Odoo read-only (`/api/odoo/*`, validación de params, datos reales)
 - [x] Fase 5.5 — Visor de conocimiento (Drive snapshot + vault, `/api/knowledge/*`) y Data Quality Center (`/api/quality/issues`)
+- [x] Fase 6 — Shell (barra superior + nav lateral) con vistas navegables y Knowledge Map orbital (`/api/knowledge/graph`)
+- [x] Fase 7 — Document cards + "Regenerate" con preview/diff y confirmación explícita (`/api/regenerate/*`)
 - [ ] Fase 6 — Dashboard visual completo
 - [ ] Fase 7 — Document cards y modal Markdown
 - [ ] Fase 8 — Pruebas, seguridad y documentación final
+
+## Conecta tu propio vault (cada usuario el suyo)
+
+El dashboard **no depende del vault de nadie en particular**. Al abrirlo, ve a
+**Settings** (icono de engranaje) y conecta cualquier vault de Obsidian o
+carpeta de notas de tu computadora:
+
+- **Detección automática** — lista las carpetas de tu máquina que parecen vault
+  (tienen `.obsidian` o `.claude`); un clic en *Use* y listo.
+- **Ruta manual** — pega la ruta y usa *Check* para validarla antes de conectar.
+- **Efecto inmediato** — todo (vault summary, Knowledge, acciones de Claude,
+  Odoo, Regenerate) apunta al vault conectado **sin reiniciar** el backend.
+- **Se guarda localmente** en `backend/data/settings.json` (gitignored), así que
+  tu elección es tuya y no viaja al repo.
+
+Precedencia: **tu elección en la UI** > `MYBRAIN_VAULT_PATH` > `~/Documents/MyBrain`.
+*Reset to default* borra tu elección.
+
+**Validaciones** (para que el resto del sistema no apunte a cualquier cosa): la
+ruta debe existir, ser un directorio, contener notas `.md` o `.obsidian`, y se
+rechazan rutas demasiado amplias (raíz del disco o tu carpeta de usuario) —
+si no, la lectura del vault y la escritura de *Regenerate* tendrían al alcance
+archivos que no son notas.
+
+Endpoints: `GET /api/vault/config`, `GET /api/vault/inspect?path=`,
+`GET /api/vault/detect`, `POST /api/vault/config`, `POST /api/vault/config/reset`.
 
 ## Knowledge snapshot (Drive) y Data Quality Center
 
@@ -110,6 +138,31 @@ los 11 campos de revisión (tipo, severidad, estado, confianza, fuente, fecha,
 evidencia, impacto, métricas afectadas, responsable, recomendación). **Solo
 detecta y recomienda** — nunca escribe en Odoo; cualquier corrección quedaría
 marcada como acción de escritura que requiere confirmación explícita.
+
+## Regenerate (Pattern B) — cómo se protege tu vault
+
+El botón **Regenerate** del modal de una nota del vault **nunca sobrescribe en
+silencio**. El flujo tiene dos fases separadas:
+
+1. **Preview** (`POST /api/regenerate/preview`) — corre `claude -p` en modo
+   **solo-lectura** (`--allowedTools Read`), que lee la nota y emite una
+   propuesta por stdout. **No escribe nada.**
+2. **Confirmación** — la UI muestra un **diff línea a línea** (+añadidas /
+   −eliminadas) de la nota actual vs. la propuesta. Sin tu clic explícito en
+   *Confirm overwrite*, no pasa nada.
+3. **Apply** (`POST /api/regenerate/apply`) — el backend escribe **exactamente
+   los bytes que aprobaste** y guarda un **backup** de la versión previa en
+   `backend/data/regenerate-backups/` (gitignored). El cambio queda en el git
+   de tu vault para que lo revises/revirtas.
+
+**Por qué el apply lo hace el backend y no un segundo `claude -p`:** el PRD
+sugiere que Regenerate dispare un `claude -p` que sobrescriba, pero la regla 9
+del vault exige aprobar el **contenido exacto** antes de escribir. Un segundo
+`claude -p` podría generar algo distinto a lo que viste en el diff. Por eso la
+*generación* va por Claude y la *escritura* aplica los bytes ya aprobados.
+
+Salvaguardas: solo notas `.md` dentro del vault (anti path-traversal), se
+rechaza contenido vacío o demasiado corto, y siempre hay backup.
 
 ## Troubleshooting
 
