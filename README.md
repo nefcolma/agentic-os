@@ -174,6 +174,7 @@ Cloudflare; la cabecera del email **no** se confía por sí sola.
 - [x] Fase 7 — Document cards + "Regenerate" con preview/diff y confirmación explícita (`/api/regenerate/*`)
 - [x] Vault conectable por usuario (Settings → runtime, sin reiniciar)
 - [x] Fase 8 — Pruebas (`npm test`), hardening anti-CSRF/DNS-rebinding y revisión de seguridad ([SECURITY.md](SECURITY.md))
+- [x] Acceso remoto (Cloudflare Tunnel + Access, rol read-only) y chat **Ask the Brain** (`/api/ask`)
 - [ ] Fase 6 — Dashboard visual completo
 - [ ] Fase 7 — Document cards y modal Markdown
 - [ ] Fase 8 — Pruebas, seguridad y documentación final

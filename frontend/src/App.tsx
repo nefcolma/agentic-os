@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Gauge, Network, Zap, Database, ShieldCheck, FileText, Settings } from 'lucide-react'
+import { Gauge, MessageSquare, Network, Zap, Database, ShieldCheck, FileText, Settings } from 'lucide-react'
 import { useApiGet } from './lib/api'
 import type { HealthResponse, VaultSummary } from './lib/types'
 import { Panel, Pill, KeyValue } from './components/ui'
@@ -15,9 +15,11 @@ import { QualityPanel } from './modules/QualityPanel'
 import { KnowledgeMap } from './modules/KnowledgeMap'
 import { SessionProvider, useSession } from './lib/session'
 import { SettingsPanel } from './modules/SettingsPanel'
+import { AskPanel } from './modules/AskPanel'
 
 const NAV: NavItem[] = [
   { id: 'command', label: 'Command', icon: Gauge },
+  { id: 'ask', label: 'Ask the Brain', icon: MessageSquare },
   { id: 'map', label: 'Knowledge Map', icon: Network },
   { id: 'actions', label: 'Actions', icon: Zap },
   { id: 'odoo', label: 'Odoo', icon: Database },
@@ -107,6 +109,12 @@ function Dashboard() {
           <SystemCard health={health} />
           <VaultPanel />
           <NightlyLogPanel />
+        </Container>
+      )}
+
+      {view === 'ask' && (
+        <Container>
+          <AskPanel />
         </Container>
       )}
 

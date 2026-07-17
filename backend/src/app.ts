@@ -14,6 +14,7 @@ import { qualityRouter } from './routes/quality.js'
 import { regenerateRouter } from './routes/regenerate.js'
 import { vaultConfigRouter } from './routes/vault-config.js'
 import { sessionRouter } from './routes/session.js'
+import { askRouter } from './routes/ask.js'
 import { hostGuard, csrfGuard } from './middleware/security.js'
 import { accessGuard, roleGuard } from './middleware/access.js'
 
@@ -54,6 +55,7 @@ export function createApp(): express.Express {
   app.use(qualityRouter)
   app.use(regenerateRouter)
   app.use(vaultConfigRouter)
+  app.use(askRouter)
 
   app.use('/api', apiNotFound)
 
