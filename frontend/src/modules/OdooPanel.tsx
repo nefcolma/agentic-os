@@ -127,6 +127,9 @@ function InventoryCard() {
                 ))}
               </ul>
             )}
+            <p className="mt-2 font-mono text-[10px] text-neutral-600">
+              scoped to {data.summary?.company ?? 'company'} · internal locations · on hand = Odoo On Hand
+            </p>
             <PulledAt iso={data.pulledAt} />
           </div>
         )}

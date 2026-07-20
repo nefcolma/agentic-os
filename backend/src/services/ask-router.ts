@@ -60,22 +60,29 @@ function distinctiveTerms(question: string): string[] {
   return out.slice(0, 4)
 }
 
-function buildGrounding(terms: string[], pulledAt: string, matches: ProductMatch[]): string {
-  const head = `LIVE ODOO CATALOG LOOKUP — product.product where name matches [${terms.join(', ')}] (pulled ${pulledAt.slice(0, 19)}Z):`
+function buildGrounding(
+  terms: string[],
+  pulledAt: string,
+  matches: ProductMatch[],
+  totalOnHand: number,
+): string {
+  const head = `LIVE ODOO ON-HAND LOOKUP — scoped stock.quant (one company, internal locations) where product name matches ALL of [${terms.join(', ')}] (pulled ${pulledAt.slice(0, 19)}Z):`
   if (matches.length === 0) {
     return (
       `${head}\n(no catalog matches)\n` +
       'The product may be named differently. Before concluding it does not exist, you may search Odoo yourself ' +
-      'with: python3 .claude/skills/odoo-sync/odoo_sync.py query --model product.product --domain \'[["name","ilike","<term>"]]\' --fields "name,default_code,qty_available".'
+      'with: python3 .claude/skills/odoo-sync/odoo_sync.py inventory --product "<name>" --company-id <id>.'
     )
   }
   const rows = matches
-    .map((m) => `- ${m.name}${m.code ? ` [${m.code}]` : ''} · on hand ${m.onHand} · forecast ${m.forecast}`)
+    .map((m) => `- ${m.name}${m.code ? ` [${m.code}]` : ''} · on hand ${m.onHand} · available ${m.available}`)
     .join('\n')
   return (
     `${head}\n${rows}\n` +
-    'Rules: these are live catalog matches. A product listed here EXISTS even if on-hand is 0 (that means out of stock, ' +
-    'NOT nonexistent). Use these exact names / SKUs / quantities; never claim a listed product does not exist.'
+    `TOTAL on hand across ${matches.length} variant(s): ${totalOnHand}\n` +
+    'Rules: these are live, company-scoped on-hand figures (Odoo On Hand, not qty_available). A product listed ' +
+    'here EXISTS even if on-hand is 0 (out of stock, NOT nonexistent). The TOTAL is a sum across distinct variants — ' +
+    'do not present it as a single product. Use these exact names / SKUs / quantities.'
   )
 }
 
@@ -116,12 +123,12 @@ export async function routeQuestion(question: string): Promise<RouteOutcome> {
   }
 
   try {
-    const { pulledAt, matches } = await lookupProducts(terms)
+    const { pulledAt, matches, totalOnHand } = await lookupProducts(terms)
     routing.route = 'Odoo live · catalog lookup'
-    routing.sources = ['Odoo product.product (live)']
+    routing.sources = ['Odoo stock.quant (live, scoped)']
     routing.productMatches = matches
     routing.lookupTerms = terms
-    return { routing, grounding: buildGrounding(terms, pulledAt, matches) }
+    return { routing, grounding: buildGrounding(terms, pulledAt, matches, totalOnHand) }
   } catch {
     // Lookup failed (Odoo down) — let Claude try, don't block the answer.
     routing.route = 'Odoo live · lookup failed, delegating to Claude'

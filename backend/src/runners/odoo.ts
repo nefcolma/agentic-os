@@ -191,6 +191,71 @@ export interface InventorySummary {
   totalQuantity: number
   outOfStock: number
   lowStock: number
+  /** Company the on-hand figures are scoped to (from the script's scope block). */
+  company: string | null
+}
+
+/**
+ * Shape emitted by `odoo_sync.py inventory` (the scoped, per-product envelope).
+ * On a scope failure the script emits `{status:"error", error}` with exit 2.
+ */
+interface ScriptInventoryProduct {
+  product_id: number | null
+  product_name: string
+  on_hand: number
+  reserved: number
+  available: number
+  by_location: {
+    location_id: number | null
+    location_name: string
+    quantity: number
+    reserved_quantity: number
+  }[]
+}
+interface ScriptInventoryEnvelope {
+  status: 'ok' | 'error'
+  error?: string
+  scope?: { company?: { id: number; name: string } }
+  matched_products?: number | null
+  variants_total?: { variant_count: number; on_hand: number; reserved: number; available: number }
+  products?: ScriptInventoryProduct[]
+}
+
+/**
+ * Runs the `inventory` subcommand and parses its OBJECT envelope (the other
+ * subcommands return a JSON array; inventory is scoped and returns a single
+ * object). A `status:"error"` fail-safe (multiple companies, unauthorized
+ * location, …) is surfaced as an OdooError with the script's own message.
+ */
+async function pullInventoryEnvelope(args: string[]): Promise<ScriptInventoryEnvelope> {
+  const result = await runScript('inventory', args)
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(result.stdout)
+  } catch {
+    throw new OdooError('Odoo inventory returned unparseable output')
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new OdooError('Odoo inventory returned an unexpected shape')
+  }
+  const env = parsed as ScriptInventoryEnvelope
+  if (env.status === 'error') {
+    throw new OdooError(redactSecrets(env.error ?? 'inventory scope error'))
+  }
+  if (result.code !== 0) {
+    const detail = redactSecrets(result.stderr.trim()) || `exit code ${String(result.code)}`
+    throw new OdooError(detail)
+  }
+  return env
+}
+
+/** Extracts a leading `[CODE]` from an Odoo display name, if present. */
+function extractCode(displayName: string): string | null {
+  const m = /^\s*\[([^\]]+)\]\s*/.exec(displayName ?? '')
+  return m ? m[1]! : null
+}
+function stripCode(displayName: string): string {
+  return (displayName ?? '').replace(/^\s*\[[^\]]+\]\s*/, '').trim()
 }
 
 export interface TopClientRow {
@@ -238,24 +303,42 @@ export async function getInventory(query: {
 }): Promise<OdooEnvelope<InventoryRow, InventorySummary>> {
   const product = parseProduct(query.product)
   const limit = boundedInt('limit', query.limit, 50, 1, 500)
-  const args = ['--limit', String(limit)]
+  const companyId = config.odoo.companyId
+  const args = ['--company-id', String(companyId), '--limit', String(limit)]
   if (product !== undefined) args.push('--product', product)
 
-  const raw = await pull<Record<string, unknown>>('inventory', args)
-  const rows: InventoryRow[] = raw.map((r) => ({
-    productId: m2oId(r.product_id),
-    product: m2oName(r.product_id),
-    location: m2oName(r.location_id),
-    quantity: num(r.quantity),
-    reserved: num(r.reserved_quantity),
-  }))
+  const env = await pullInventoryEnvelope(args)
+  const products = env.products ?? []
+
+  // Flatten product × location back into per-line rows so the existing quality
+  // detectors (per-line negatives) and the inventory card keep working. A
+  // product with no stock still contributes one zero-on-hand line so it stays
+  // visible. On-hand is now correct: one company, internal locations only.
+  const rows: InventoryRow[] = []
+  for (const p of products) {
+    if (p.by_location.length === 0) {
+      rows.push({ productId: p.product_id, product: p.product_name, location: '', quantity: p.on_hand, reserved: p.reserved })
+    } else {
+      for (const loc of p.by_location) {
+        rows.push({
+          productId: p.product_id,
+          product: p.product_name,
+          location: loc.location_name,
+          quantity: loc.quantity,
+          reserved: loc.reserved_quantity,
+        })
+      }
+    }
+  }
   const summary: InventorySummary = {
     lines: rows.length,
-    totalQuantity: Math.round(rows.reduce((s, r) => s + r.quantity, 0) * 100) / 100,
-    outOfStock: rows.filter((r) => r.quantity <= 0).length,
-    lowStock: rows.filter((r) => r.quantity > 0 && r.quantity < LOW_STOCK_THRESHOLD).length,
+    totalQuantity: Math.round((env.variants_total?.on_hand ?? 0) * 100) / 100,
+    // out-of-stock / low-stock are per PRODUCT (aggregated on-hand), not per line.
+    outOfStock: products.filter((p) => p.on_hand <= 0).length,
+    lowStock: products.filter((p) => p.on_hand > 0 && p.on_hand < LOW_STOCK_THRESHOLD).length,
+    company: env.scope?.company?.name ?? null,
   }
-  return envelope('inventory', { ...(product ? { product } : {}), limit }, rows, summary)
+  return envelope('inventory', { ...(product ? { product } : {}), companyId, limit }, rows, summary)
 }
 
 export async function getTopClients(query: {
@@ -314,52 +397,51 @@ export async function getDecliningClients(query: {
 }
 
 /**
- * Deterministic catalog lookup used by the Ask router (`query` subcommand,
- * `search_read` over product.product with substring `ilike` — read-only).
- * Terms are validated with the same rules as the `product` query param and
- * passed as a single JSON domain argv entry (shell:false, no interpolation).
+ * Deterministic catalog lookup used by the Ask router. Goes through the SCOPED
+ * `inventory` subcommand (stock.quant, one company, internal locations) so
+ * on-hand is Odoo's real On Hand — never `qty_available`, which aggregates
+ * across companies and virtual locations (that is what inflated a true 1 to
+ * 377). A token-AND product search returns every real variant of a name.
  */
 export interface ProductMatch {
   id: number | null
   name: string
   code: string | null
   onHand: number
-  forecast: number
+  available: number
 }
 
 export async function lookupProducts(
   terms: string[],
   limit = 20,
-): Promise<{ pulledAt: string; matches: ProductMatch[] }> {
+): Promise<{ pulledAt: string; matches: ProductMatch[]; totalOnHand: number }> {
   const cleaned = terms
     .map((t) => parseProduct(t))
     .filter((t): t is string => t !== undefined && t.length >= 2)
     .slice(0, 4)
-  if (cleaned.length === 0) return { pulledAt: new Date().toISOString(), matches: [] }
+  if (cleaned.length === 0) return { pulledAt: new Date().toISOString(), matches: [], totalOnHand: 0 }
 
-  // OR-domain: (n-1) "|" prefixes followed by one ilike leaf per term.
-  const domain: unknown[] = []
-  for (let i = 0; i < cleaned.length - 1; i++) domain.push('|')
-  for (const term of cleaned) domain.push(['name', 'ilike', term])
-
-  const raw = await pull<Record<string, unknown>>('query', [
-    '--model',
-    'product.product',
-    '--domain',
-    JSON.stringify(domain),
-    '--fields',
-    'name,default_code,qty_available,virtual_available',
+  const env = await pullInventoryEnvelope([
+    '--company-id',
+    String(config.odoo.companyId),
+    '--product',
+    cleaned.join(' '),
     '--limit',
     String(Math.min(Math.max(limit, 1), 100)),
   ])
-  const matches: ProductMatch[] = raw.map((r) => ({
-    id: typeof r.id === 'number' ? r.id : null,
-    name: typeof r.name === 'string' ? r.name : '',
-    code: typeof r.default_code === 'string' && r.default_code !== '' ? r.default_code : null,
-    onHand: num(r.qty_available),
-    forecast: num(r.virtual_available),
+  const products = env.products ?? []
+  const matches: ProductMatch[] = products.map((p) => ({
+    id: p.product_id,
+    name: stripCode(p.product_name),
+    code: extractCode(p.product_name),
+    onHand: p.on_hand,
+    available: p.available,
   }))
-  return { pulledAt: new Date().toISOString(), matches }
+  return {
+    pulledAt: new Date().toISOString(),
+    matches,
+    totalOnHand: env.variants_total?.on_hand ?? 0,
+  }
 }
 
 export async function getOverdueInvoices(query: {

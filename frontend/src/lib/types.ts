@@ -140,6 +140,8 @@ export interface InventorySummary {
   totalQuantity: number
   outOfStock: number
   lowStock: number
+  /** Company the on-hand figures are scoped to. */
+  company: string | null
 }
 
 export interface TopClientRow {

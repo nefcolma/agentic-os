@@ -56,6 +56,15 @@ export interface AppConfig {
     /** Shared Drive folder the snapshot is extracted from (read-only). */
     driveFolderId: string
   }
+  odoo: {
+    /**
+     * Company to scope inventory (on-hand) reads to. The Odoo instance is
+     * multi-company; inventory MUST be scoped or the script fails safe rather
+     * than aggregating across companies. Defaults to UPD Urns (the live
+     * company); override with ODOO_COMPANY_ID.
+     */
+    companyId: number
+  }
   timeouts: {
     claudeRunMs: number
     odooMs: number
@@ -184,6 +193,9 @@ function buildConfig(): AppConfig {
         ),
       ),
       driveFolderId: (process.env.DRIVE_FOLDER_ID ?? '1qjGOwd5VRkCfaR2MfESUGqmHKFGEYv2b').trim(),
+    },
+    odoo: {
+      companyId: intFromEnv('ODOO_COMPANY_ID', 2, 1, 1_000_000),
     },
     timeouts: {
       claudeRunMs: intFromEnv('CLAUDE_RUN_TIMEOUT_MS', 900_000, 1_000, 3_600_000),
