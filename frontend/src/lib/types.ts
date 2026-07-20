@@ -308,3 +308,58 @@ export interface QualityScan {
   missing?: string[]
   message?: string
 }
+
+// ── System Map (GET /api/system-map) ─────────────────────────────────────
+
+export type SystemNodeType = 'application' | 'routine' | 'memory' | 'skill'
+
+export type SystemNodeStatus =
+  | 'active'
+  | 'available'
+  | 'manual'
+  | 'not_configured'
+  | 'missing'
+  | 'stale'
+  | 'disabled'
+
+export type SystemVerificationStatus = 'verified' | 'declared' | 'unresolved'
+
+export interface SystemNode {
+  id: string
+  type: SystemNodeType
+  label: string
+  description: string
+  status: SystemNodeStatus
+  company?: string
+  metadata: Record<string, string | number | boolean | null>
+}
+
+export interface SystemEvidence {
+  kind: 'run_definition' | 'config' | 'filesystem' | 'prompt' | 'tool_scope' | 'manual_declaration'
+  reference: string
+  detail: string
+}
+
+export interface SystemEdge {
+  id: string
+  source: string
+  target: string
+  relationship:
+    | 'uses'
+    | 'reads_from'
+    | 'writes_to'
+    | 'generates'
+    | 'updates'
+    | 'triggered_by'
+    | 'depends_on'
+  verification: SystemVerificationStatus
+  evidence: SystemEvidence[]
+}
+
+export interface SystemMapResponse {
+  generatedAt: string
+  nodes: SystemNode[]
+  edges: SystemEdge[]
+  counts: Record<SystemNodeType, number>
+  warnings: string[]
+}

@@ -313,6 +313,55 @@ export async function getDecliningClients(query: {
   return envelope('declining-clients', { days, limit, minOrders, businessOnly }, rows, summary)
 }
 
+/**
+ * Deterministic catalog lookup used by the Ask router (`query` subcommand,
+ * `search_read` over product.product with substring `ilike` — read-only).
+ * Terms are validated with the same rules as the `product` query param and
+ * passed as a single JSON domain argv entry (shell:false, no interpolation).
+ */
+export interface ProductMatch {
+  id: number | null
+  name: string
+  code: string | null
+  onHand: number
+  forecast: number
+}
+
+export async function lookupProducts(
+  terms: string[],
+  limit = 20,
+): Promise<{ pulledAt: string; matches: ProductMatch[] }> {
+  const cleaned = terms
+    .map((t) => parseProduct(t))
+    .filter((t): t is string => t !== undefined && t.length >= 2)
+    .slice(0, 4)
+  if (cleaned.length === 0) return { pulledAt: new Date().toISOString(), matches: [] }
+
+  // OR-domain: (n-1) "|" prefixes followed by one ilike leaf per term.
+  const domain: unknown[] = []
+  for (let i = 0; i < cleaned.length - 1; i++) domain.push('|')
+  for (const term of cleaned) domain.push(['name', 'ilike', term])
+
+  const raw = await pull<Record<string, unknown>>('query', [
+    '--model',
+    'product.product',
+    '--domain',
+    JSON.stringify(domain),
+    '--fields',
+    'name,default_code,qty_available,virtual_available',
+    '--limit',
+    String(Math.min(Math.max(limit, 1), 100)),
+  ])
+  const matches: ProductMatch[] = raw.map((r) => ({
+    id: typeof r.id === 'number' ? r.id : null,
+    name: typeof r.name === 'string' ? r.name : '',
+    code: typeof r.default_code === 'string' && r.default_code !== '' ? r.default_code : null,
+    onHand: num(r.qty_available),
+    forecast: num(r.virtual_available),
+  }))
+  return { pulledAt: new Date().toISOString(), matches }
+}
+
 export async function getOverdueInvoices(query: {
   limit?: unknown
 }): Promise<OdooEnvelope<OverdueInvoiceRow, OverdueSummary>> {

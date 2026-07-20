@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Gauge, MessageSquare, Network, Zap, Database, ShieldCheck, FileText, Settings } from 'lucide-react'
+import { Gauge, MessageSquare, Network, Workflow, Zap, Database, ShieldCheck, FileText, Settings } from 'lucide-react'
 import { useApiGet } from './lib/api'
 import type { HealthResponse, VaultSummary } from './lib/types'
 import { Panel, Pill, KeyValue } from './components/ui'
@@ -13,6 +13,7 @@ import { OdooPanel } from './modules/OdooPanel'
 import { KnowledgePanel } from './modules/KnowledgePanel'
 import { QualityPanel } from './modules/QualityPanel'
 import { KnowledgeMap } from './modules/KnowledgeMap'
+import { SystemMap } from './modules/SystemMap'
 import { SessionProvider, useSession } from './lib/session'
 import { SettingsPanel } from './modules/SettingsPanel'
 import { AskPanel } from './modules/AskPanel'
@@ -21,6 +22,7 @@ const NAV: NavItem[] = [
   { id: 'command', label: 'Command', icon: Gauge },
   { id: 'ask', label: 'Ask the Brain', icon: MessageSquare },
   { id: 'map', label: 'Knowledge Map', icon: Network },
+  { id: 'system-map', label: 'System Map', icon: Workflow },
   { id: 'actions', label: 'Actions', icon: Zap },
   { id: 'odoo', label: 'Odoo', icon: Database },
   { id: 'quality', label: 'Data Quality', icon: ShieldCheck },
@@ -121,6 +123,12 @@ function Dashboard() {
       {view === 'map' && (
         <Container wide>
           <KnowledgeMap />
+        </Container>
+      )}
+
+      {view === 'system-map' && (
+        <Container wide>
+          <SystemMap />
         </Container>
       )}
 

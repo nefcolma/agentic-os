@@ -28,7 +28,8 @@ export interface QualityScan {
   message?: string
 }
 
-const STALE_SNAPSHOT_DAYS = 7
+/** Shared staleness threshold — the System Map reuses this same limit. */
+export const STALE_SNAPSHOT_DAYS = 7
 
 /** Flags the local knowledge snapshot as stale — the one detector over snapshot data. */
 function detectStaleSnapshot(): QualityIssue[] {
